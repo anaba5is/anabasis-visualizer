@@ -3,7 +3,7 @@ import { captions } from './captions.mjs';
 
 import { scenes } from './scenes.mjs';
 import { mapLabels, routeWaypoints, uncertainLegs } from './map-data.mjs';
-import { createGlobe, createProjector } from './globe.mjs';
+import { createGlobe, createProjector, keepPointInFrame } from './globe.mjs';
 import { makeTimeline } from './timeline.mjs';
 import { createPlayback } from './playback.mjs';
 import { addHistoricalLayer } from './historical-layer.mjs';
@@ -108,7 +108,6 @@ let gesture;
 let suppressClickUntil = 0;
 let drawHistoricalLayer;
 let routeLayer;
-let markerLayer;
 let namesLayer;
 let trail;
 let tracer;
@@ -302,7 +301,6 @@ function setupMarkers() {
     markerNodes.push(marker);
     labelNodes.push(label);
   });
-  markerLayer = markers;
   namesLayer = labels;
   map.append(markers, labels);
 }
@@ -346,14 +344,15 @@ function renderStory(stop, i) {
   copy.append(
     html('p', 'stop-region', placeAndBook(stop) + ' · ' + formatStopDate(stop)),
     title,
-    html('p', 'stop-summary', captions[stop.id]),
   );
+  const summary = html('p', 'stop-summary', captions[stop.id]);
   const expand = html('button', 'scene-action');
   expand.type = 'button';
   expand.setAttribute('aria-label', `Read scene for ${stop.name}`);
+  expand.setAttribute('aria-haspopup', 'dialog');
   expand.append(html('span', 'scene-action-label', 'Read scene'));
   expand.addEventListener('click', () => openScene(expand));
-  storyContent.replaceChildren(sceneFigure(scene), copy, expand);
+  storyContent.replaceChildren(copy, sceneFigure(scene), summary, expand);
 
   phoneThumb.src = `./assets/previews/thumb-${scene.file}`;
   phoneStage.textContent = `${formatStopDate(stop)} · ${i + 1} / ${stops.length}`;
@@ -510,7 +509,15 @@ function cameraFrame() {
 
 function getView() {
   const frame = cameraFrame();
-  const view = { ...frame, ...camera, radius: frame.baseline * camera.scale, focusId: worldFocus?.id };
+  const readerOpen = sceneReader.isSideOpen();
+  const view = { ...frame, ...camera, radius: frame.baseline * camera.scale, focusId: worldFocus?.id, readerOpen };
+  if (readerOpen) {
+    const adjusted = keepPointInFrame(stops[selectedIndex].coords, view);
+    if (adjusted) {
+      Object.assign(camera, adjusted);
+      Object.assign(view, adjusted);
+    }
+  }
   view.locate = createProjector(view);
   return view;
 }
@@ -535,7 +542,7 @@ function draw() {
   drawFrame = undefined;
   const view = getView();
   if (!view.width || !view.height) return;
-  const storyMap = !worldFocus && (mode === 'route' || sceneReader.isSideOpen() || (playback.isPlaying() && followControl.checked));
+  const storyMap = !worldFocus && (mode === 'route' || view.readerOpen || (playback.isPlaying() && followControl.checked));
   atlasWindow.classList.toggle('story-map', storyMap);
   view.storyMap = storyMap;
   seaMoment.hidden = !storyMap || stops[selectedIndex].id !== 'mount-theches';
@@ -546,7 +553,7 @@ function draw() {
     surface.draw({ ...view, terrain: layers.terrain });
   }
   viewAtLastDraw = view;
-  const overlayKey = `${projection}|${selectedIndex}|${worldFocus?.id ?? ''}|${storyMap}|${Object.values(layers).join(',')}`;
+  const overlayKey = `${projection}|${selectedIndex}|${worldFocus?.id ?? ''}|${storyMap}|${view.readerOpen}|${Object.values(layers).join(',')}`;
   if (lastProjectedView === overlayKey) {
     drawTrail(view);
     return;
@@ -556,13 +563,13 @@ function draw() {
   if (map.getAttribute('viewBox') !== viewBox) map.setAttribute('viewBox', viewBox);
   const positions = stops.map(stop => view.locate(stop.coords));
   routeLayer.style.display = layers.route ? '' : 'none';
-  markerLayer.style.display = layers.route ? '' : 'none';
-  namesLayer.style.display = layers.route && layers.places ? '' : 'none';
-  const pinBounds = layers.route ? positions.flatMap((point, i) => {
-    if (!point.visible || (i !== selectedIndex && view.scale <= .39)) return [];
+  const showPin = i => i === selectedIndex ? layers.route || view.readerOpen : layers.route && view.scale > .39;
+  namesLayer.style.display = layers.places && (layers.route || view.readerOpen) ? '' : 'none';
+  const pinBounds = positions.flatMap((point, i) => {
+    if (!point.visible || !showPin(i)) return [];
     const r = i === selectedIndex ? 12 : 7;
     return [{ left: point.x - r, right: point.x + r, top: point.y - r, bottom: point.y + r }];
-  }) : [];
+  });
   const { occupied: stopLabels } = labelRenderer.drawStops(view, positions, selectedIndex, layers, pinBounds);
   const routeAnchor = layers.route ? positions[selectedIndex] : null;
   const historicalLabels = drawHistoricalLayer(view, layers, routeAnchor, stopLabels);
@@ -585,7 +592,7 @@ function draw() {
   stops.forEach((stop, i) => {
     const { x, y, visible } = positions[i];
     const inFrame = visible && x > 5 && x < view.width - 5 && y > 5 && y < view.height - 5;
-    const showMarker = inFrame && (view.scale > .39 || i === selectedIndex);
+    const showMarker = inFrame && showPin(i);
     const marker = markerNodes[i];
     marker.setAttribute('visibility', showMarker ? 'visible' : 'hidden');
     marker.setAttribute('tabindex', showMarker ? '0' : '-1');
@@ -797,6 +804,7 @@ const sceneReader = createSceneReader(readerDialog, {
   pause: () => setPlaying(false),
   onLayout(sideOpen) {
     atlasWindow.classList.toggle('scene-reading', sideOpen);
+    storyPanel.inert = sideOpen;
     resizeMap();
   },
   fallbackFocus() {

@@ -70,7 +70,6 @@ export function createSceneReader(dialog, { index, select, pause, fallbackFocus,
     readerRegion.textContent = placeAndBook(stop) + ' · ' + formatStopDate(stop);
     readerTitle.textContent = stop.name;
     readerImage.src = `./assets/${scene.file}`;
-    readerImage.classList.toggle('contain', Boolean(scene.contain));
     readerImage.alt = scene.alt;
     const objectMetadata = [scene.imageKind, scene.objectDate].filter(Boolean);
     const caption = html('span', '', scene.caption);
@@ -80,7 +79,9 @@ export function createSceneReader(dialog, { index, select, pause, fallbackFocus,
       readerCaption.replaceChildren(caption);
     }
     readerLead.replaceChildren(html('h3', '', stop.title), html('p', '', stop.summary));
-    const content = document.createDocumentFragment();
+    const backstory = html('details', 'reader-backstory');
+    backstory.append(html('summary', '', 'Backstory'));
+    const content = html('div', 'reader-backstory-copy');
     const chapter = journeyChapters[stop.phase];
     if (stop.id === 'sardis') {
       content.append(contextNote(expeditionContext));
@@ -96,8 +97,8 @@ export function createSceneReader(dialog, { index, select, pause, fallbackFocus,
     if (stop.whyItMatters) content.append(html('p', 'reader-takeaway', stop.whyItMatters));
     const context = sceneContext[stop.id];
     if (context) content.append(contextNote(context));
-    content.append(passageNotes(stop, scene));
-    readerCopy.replaceChildren(content);
+    backstory.append(content);
+    readerCopy.replaceChildren(backstory, passageNotes(stop, scene));
     readerPrevious.disabled = i === 0;
     readerNext.disabled = i === stops.length - 1;
     dialog.scrollTop = 0;

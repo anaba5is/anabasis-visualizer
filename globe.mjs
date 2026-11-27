@@ -53,6 +53,30 @@ export function createProjector({ lon, lat, x, y, radius }) {
   return point => projectPoint(point, lon, sinCenter, cosCenter, x, y, radius);
 }
 
+// Keep the real projected stop clear of the reader, even if a pan or zoom
+// would put it under the panel or beyond the visible hemisphere.
+export function keepPointInFrame(coords, view) {
+  const { left, right, top, bottom } = view.labelBounds;
+  const insetX = Math.min(40, (right - left) / 4);
+  const insetY = Math.min(32, (bottom - top) / 4);
+  const fits = point => point.visible && point.x >= left + insetX && point.x <= right - insetX
+    && point.y >= top + insetY && point.y <= bottom - insetY;
+  if (fits(project(coords, view))) return null;
+
+  const [lon, lat] = coords;
+  const dx = ((view.lon - lon + 540) % 360) - 180;
+  const dy = view.lat - lat;
+  const cameraAt = t => ({ lon: ((lon + dx * t + 540) % 360) - 180, lat: lat + dy * t });
+  let inside = 0;
+  let outside = 1;
+  for (let i = 0; i < 12; i++) {
+    const t = (inside + outside) / 2;
+    if (fits(project(coords, { ...view, ...cameraAt(t) }))) inside = t;
+    else outside = t;
+  }
+  return cameraAt(inside);
+}
+
 const [WEST, SOUTH, EAST, NORTH] = REGIONAL_BOUNDS;
 const regionCenter = { lon: (WEST + EAST) / 2, lat: (SOUTH + NORTH) / 2 };
 const regionProject = createProjector({ ...regionCenter, x: 0, y: 0, radius: 1 });

@@ -102,7 +102,7 @@
               <span>Begin the journey</span>
               <span>Cyrus’s army seeks a way home.</span>
             </button>
-            <button class="phone-scene" id="phone-scene" type="button">
+            <button class="phone-scene" id="phone-scene" type="button" aria-haspopup="dialog">
               <span class="phone-thumb"><img id="phone-thumb-image" alt="" width="40" height="40" loading="lazy" decoding="async"></span>
               <span class="phone-scene-title"><span class="phone-stage"></span><span class="phone-place"></span></span>
             </button>
@@ -200,14 +200,14 @@
           <button type="button" id="reader-previous" aria-label="Previous scene">‹</button>
           <button type="button" id="reader-next" aria-label="Next scene">›</button>
         </nav>
-        <form method="dialog"><button type="submit" aria-label="Close scene" autofocus>Done</button></form>
+        <form method="dialog"><button type="submit" aria-label="Close scene" autofocus>Close</button></form>
       </div>
     </header>
-    <div class="scene-viewer-lead" id="scene-viewer-lead"></div>
     <figure>
       <img alt="">
       <figcaption></figcaption>
     </figure>
+    <div class="scene-viewer-lead" id="scene-viewer-lead"></div>
     <div class="scene-viewer-copy" id="scene-viewer-copy"></div>
   </dialog>
 </body>

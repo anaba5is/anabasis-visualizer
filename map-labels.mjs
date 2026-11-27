@@ -47,7 +47,8 @@ export function createMapLabels(stops, stopNodes, places, stopLayouts) {
       const isSelected = index === selectedIndex;
       const isFeatured = view.width >= 690 && view.scale > .54 && layout.featured;
       const isPreviewed = node.classList.contains('preview');
-      if (!layers.route || !layers.places || !point.visible || !(isSelected || isFeatured || isPreviewed)) {
+      const routeVisible = layers.route || (isSelected && view.readerOpen);
+      if (!routeVisible || !layers.places || !point.visible || !(isSelected || isFeatured || isPreviewed)) {
         node.setAttribute('visibility', 'hidden');
         continue;
       }

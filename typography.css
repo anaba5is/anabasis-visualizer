@@ -64,14 +64,6 @@
   line-height: .98;
   letter-spacing: -.047em;
 }
-.story-panel .stop-name {
-  font-size: clamp(1.9rem, 2.62vw, 3rem);
-  line-height: 1.02;
-}
-.scene-viewer h2 {
-  font-size: clamp(1.4rem, 3.65vw, 2.8rem);
-  line-height: 1.04;
-}
 .phone-place {
   font-size: clamp(.97rem, 3.67vw, 1.21rem);
   letter-spacing: -.025em;
