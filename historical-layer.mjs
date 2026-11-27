@@ -261,7 +261,7 @@ export function addHistoricalLayer(map) {
     measuredWidth = map.clientWidth;
   }
 
-  function drawHistoricalLayer(view, layers, routePoint, stopLabels = []) {
+  function drawHistoricalLayer(view, layers, routePoint, obstacles = []) {
     if (!view.locate) view = { ...view, locate: createProjector(view) };
     const bordersVisible = layers.borders;
     const namesVisible = bordersVisible && layers.places !== false;
@@ -277,7 +277,7 @@ export function addHistoricalLayer(map) {
     if (view.width !== measuredWidth) refreshMetrics();
 
     const bounds = labelBounds(view);
-    const occupied = [...stopLabels];
+    const occupied = [...obstacles];
     if (routePoint && onScreen(routePoint, view)) {
       occupied.push({
         left: routePoint.x - 48, right: routePoint.x + 48, top: routePoint.y - 28, bottom: routePoint.y + 24,

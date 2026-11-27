@@ -31,13 +31,13 @@ export function createMapLabels(stops, stopNodes, places, stopLayouts) {
     measurements.clear();
   }
 
-  function drawStops(view, positions, selectedIndex, layers, pins) {
+  function drawStops(view, positions, selectedIndex, layers, obstacles) {
     if (view.width !== viewportWidth) {
       viewportWidth = view.width;
       clearMetrics();
     }
 
-    const occupied = [...pins];
+    const occupied = [...obstacles];
     let selectedBox;
     const order = [selectedIndex, ...stops.keys()].filter((index, position) => position === 0 || index !== selectedIndex);
     for (const index of order) {
@@ -57,7 +57,7 @@ export function createMapLabels(stops, stopNodes, places, stopLayouts) {
       const label = place(node, point, [preferred, ...defaultStopOffsets], view.labelBounds, occupied);
       if (isSelected) selectedBox = label;
     }
-    return { occupied: occupied.slice(pins.length), selectedBox };
+    return { occupied: occupied.slice(obstacles.length), selectedBox };
   }
 
   function drawPlaces(view, occupied, showPlaces) {

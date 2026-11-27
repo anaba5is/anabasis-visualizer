@@ -4,7 +4,7 @@ import { captions } from './captions.mjs';
 import { scenes } from './scenes.mjs';
 import { mapLabels, routeWaypoints, uncertainLegs } from './map-data.mjs';
 import { createGlobe, createProjector, keepPointInFrame } from './globe.mjs';
-import { makeTimeline } from './timeline.mjs';
+import { makeTimeline } from './timeline.mjs?v=atlas-review';
 import { createPlayback } from './playback.mjs';
 import { addHistoricalLayer } from './historical-layer.mjs';
 import { historicalSources, politicalRegions } from './historical-data.mjs';
@@ -13,7 +13,9 @@ import { connectPopover } from './popover.mjs';
 import { readAtlasLocation, writeAtlasLocation } from './atlas-location.mjs';
 import { connectWorldPanel } from './world-panel.mjs';
 import { html, link } from './dom.mjs';
-import { bookFor, placeAndBook, formatStopDate, createSceneReader } from './scene-reader.mjs?v=compact-reader';
+import { createSceneReader } from './scene-reader.mjs?v=atlas-review';
+import { bookFor, placeAndBook, formatStopDate } from './journey-format.mjs';
+import { fitMapViewport } from './map-viewport.mjs';
 
 const phases = [
   { name: 'March inland', color: '#f1b66f', timelineColor: '#a4662a' },
@@ -456,51 +458,32 @@ function setPlaying(playing) {
   followLeg(selectedIndex);
 }
 
-function layoutBox(element) {
+function layoutBox(element, origin) {
   if (element.hidden) return null;
   const box = element.getBoundingClientRect();
-  return box.width > 2 && box.height > 2 ? box : null;
+  if (box.width <= 2 || box.height <= 2) return null;
+  return {
+    width: box.width,
+    left: box.left - origin.left,
+    right: box.right - origin.left,
+    top: box.top - origin.top,
+    bottom: box.bottom - origin.top,
+  };
 }
 
 function measureCameraFrame() {
-  const mapBox = mapFrame.getBoundingClientRect();
   const width = mapFrame.clientWidth;
   const height = mapFrame.clientHeight;
-  const padding = clamp(width * .029, 10, 38);
-  const dock = layoutBox(timelinePanel);
-  const scene = layoutBox(sceneReader.isSideOpen() ? readerDialog : storyPanel);
-  const opening = layoutBox(intro);
-  const sidebar = box => box && box.width < width * .57 && box.left - mapBox.left > width * .4;
-  const top = Math.max(
-    layoutBox(masthead)?.bottom ?? 0,
-    layoutBox(phaseControls)?.bottom ?? 0,
-    width < 690 ? layoutBox(worldCard)?.bottom ?? 0 : 0,
-  ) - mapBox.top + 9;
-  let left = padding;
-  let right = width - padding;
-  let bottom = height - 8;
-  if (opening) left = Math.min(width * .5, opening.right - mapBox.left + padding * .7);
-  for (const box of [scene, dock]) {
-    if (sidebar(box)) right = Math.min(right, box.left - mapBox.left - padding * .56);
-    else if (box) bottom = Math.min(bottom, box.top - mapBox.top - 8);
-  }
-  for (const box of [layoutBox(mapKey), layoutBox(mapModes), layoutBox(mapTools)]) {
-    if (box && box.right - mapBox.left > left && box.left - mapBox.left < right) {
-      bottom = Math.min(bottom, box.top - mapBox.top - 8);
-    }
-  }
-  const usableHeight = Math.max(54, bottom - top);
-  const usableWidth = Math.max(54, right - left);
-  const baseline = Math.min(usableWidth / .325, usableHeight / .215);
-  return {
-    width,
-    height,
-    x: left + usableWidth / 2,
-    y: top + usableHeight / 2,
-    baseline,
-    labelBounds: { left, top, right, bottom },
-    world: Math.min(usableWidth * .48, usableHeight * .485) / baseline,
-  };
+  const origin = mapFrame.getBoundingClientRect();
+  const box = element => layoutBox(element, origin);
+  const scene = sceneReader.isSideOpen() ? readerDialog : storyPanel;
+  const headers = width < 690 ? [masthead, phaseControls, worldCard] : [masthead, phaseControls];
+  return fitMapViewport(width, height, {
+    headers: headers.map(box),
+    panels: [scene, timelinePanel].map(box),
+    tools: [mapKey, mapModes, mapTools].map(box),
+    intro: box(intro),
+  });
 }
 
 function cameraFrame() {
@@ -570,9 +553,11 @@ function draw() {
     const r = i === selectedIndex ? 12 : 7;
     return [{ left: point.x - r, right: point.x + r, top: point.y - r, bottom: point.y + r }];
   });
-  const { occupied: stopLabels } = labelRenderer.drawStops(view, positions, selectedIndex, layers, pinBounds);
+  const callout = seaMoment.hidden ? null : layoutBox(seaMoment, mapFrame.getBoundingClientRect());
+  const occupied = callout ? [...pinBounds, callout] : pinBounds;
+  const { occupied: stopLabels } = labelRenderer.drawStops(view, positions, selectedIndex, layers, occupied);
   const routeAnchor = layers.route ? positions[selectedIndex] : null;
-  const historicalLabels = drawHistoricalLayer(view, layers, routeAnchor, stopLabels);
+  const historicalLabels = drawHistoricalLayer(view, layers, routeAnchor, callout ? [...stopLabels, callout] : stopLabels);
   const focusedPlace = worldFocus?.kind ? view.locate(worldFocus.coords) : undefined;
   worldFocusMarker.setAttribute('visibility', focusedPlace?.visible ? 'visible' : 'hidden');
   if (focusedPlace?.visible) worldFocusMarker.setAttribute('transform', `translate(${focusedPlace.x} ${focusedPlace.y})`);

@@ -2,18 +2,7 @@ import { journeyChapters, stops } from './story.mjs';
 import { scenes } from './scenes.mjs';
 import { html, link } from './dom.mjs';
 import { expeditionContext, sceneContext } from './scene-context.mjs';
-
-export function bookFor(stop) {
-  return ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][Number(stop.book[0]) - 1];
-}
-
-export function placeAndBook(stop) {
-  return `${stop.region} · Book ${bookFor(stop)}`;
-}
-
-export function formatStopDate(stop) {
-  return stop.date.startsWith('Winter ') ? stop.date : 'c. ' + stop.date;
-}
+import { placeAndBook, formatStopDate } from './journey-format.mjs';
 
 function noteSummary(label, preview) {
   const summary = html('summary', 'reader-note-summary');

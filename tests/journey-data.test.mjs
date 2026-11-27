@@ -7,6 +7,7 @@ import { captions } from '../captions.mjs';
 import { expeditionContext, sceneContext } from '../scene-context.mjs';
 import { readAtlasLocation, writeAtlasLocation } from '../atlas-location.mjs';
 import { createMapLabels } from '../map-labels.mjs';
+import { bookFor, formatStopDate } from '../journey-format.mjs';
 
 test('every stop has a date label, a scene, and its local image', () => {
   const ids = stops.map(stop => stop.id).sort();
@@ -36,6 +37,15 @@ test('historical context and artwork link to their source', () => {
       assert(existsSync(new URL('../assets/previews/' + variant + scene.file, import.meta.url)), id);
     }
   }
+});
+
+test('journey dates use the same wording in the reader and accessible timeline', () => {
+  const winter = stops.find(stop => stop.id === 'armenian-highlands');
+  assert.equal(bookFor(winter), 'IV');
+  assert.equal(formatStopDate(winter), 'Winter 401–400 BCE');
+  assert.equal(formatStopDate(winter, { spoken: true }), 'Winter 401–400 BCE');
+  assert.equal(formatStopDate(stops[0]), 'c. 401 BCE');
+  assert.equal(formatStopDate(stops[0], { spoken: true }), 'circa 401 BCE');
 });
 
 test('route, region and place bookmarks round-trip as distinct locations', () => {

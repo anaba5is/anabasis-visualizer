@@ -1,4 +1,4 @@
-const romanBooks = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+import { bookFor, formatStopDate } from './journey-format.mjs';
 
 export function makeTimeline(container, stops, phases, onSelect) {
   const colors = new Map(phases.map(phase => [phase.name, phase.timelineColor ?? phase.color]));
@@ -19,7 +19,7 @@ export function makeTimeline(container, stops, phases, onSelect) {
   const books = [];
   const entries = stops.map((stop, index) => {
     const color = colors.get(stop.phase) ?? 'var(--rust, #8a402d)';
-    const book = romanBooks[Number.parseInt(stop.book, 10) - 1];
+    const book = bookFor(stop);
     const previousBook = books.at(-1);
     if (previousBook && previousBook.name === book) previousBook.count++;
     else books.push({ name: book, count: 1, color });
@@ -34,7 +34,7 @@ export function makeTimeline(container, stops, phases, onSelect) {
     button.type = 'button';
     button.tabIndex = -1;
     const description = `${index + 1} of ${stops.length}, ${stop.name}, ${stop.phase}`;
-    button.setAttribute('aria-label', book ? `${description}, Book ${book}, circa ${stop.date}` : description);
+    button.setAttribute('aria-label', book ? `${description}, Book ${book}, ${formatStopDate(stop, { spoken: true })}` : description);
     button.addEventListener('click', () => onSelect(index));
 
     const dot = document.createElement('span');
@@ -109,7 +109,7 @@ export function makeTimeline(container, stops, phases, onSelect) {
     selectedIndex = index;
     range.value = String(index + 1);
     const description = `${index + 1} of ${stops.length}, ${stops[index].name}`;
-    range.setAttribute('aria-valuetext', selected.book ? `${description}, Book ${selected.book}, circa ${stops[index].date}` : description);
+    range.setAttribute('aria-valuetext', selected.book ? `${description}, Book ${selected.book}, ${formatStopDate(stops[index], { spoken: true })}` : description);
 
     const focused = document.activeElement;
     const tabStop = track.contains(focused) ? focused : selected.button;
