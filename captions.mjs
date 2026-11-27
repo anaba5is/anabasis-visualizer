@@ -1,0 +1,17 @@
+export const captions = {
+  sardis: 'Cyrus recruits Greek mercenaries for what he calls a campaign against the Pisidians.',
+  tarsus: 'Suspecting a march against the king, the Greeks hold out for higher pay.',
+  thapsacus: 'At the Euphrates, Cyrus tells his generals he means to fight Artaxerxes.',
+  cunaxa: 'The Greeks drive back their opponents, but Cyrus dies charging toward his brother.',
+  'great-zab': 'Tissaphernes seizes five Greek generals, and the army elects Xenophon among their replacements.',
+  mespila: 'The Greeks pass ruined cities on the Tigris as Persian forces harry their column.',
+  'carduchian-mountains': 'The Carduchians resist the army’s passage, and troops wait across the Centrites.',
+  'armenian-highlands': 'Snow, hunger and frostbite take lives as the army crosses the highlands.',
+  'mount-theches': 'The men at the front spot the Black Sea and pass the cry down the column.',
+  trapezus: 'The soldiers offer thanks at Trapezus while their commanders look for ships west.',
+  cotyora: 'Denied a market, the Greeks take supplies as envoys from Sinope intervene.',
+  calpe: 'The troops reunite at Calpe Harbor after one of the three groups suffers heavy losses.',
+  byzantium: 'Sparta’s commander orders the army out of Byzantium without the wages he promised.',
+  salmydessus: 'The Greeks campaign for Seuthes in Thrace, where another dispute over pay follows.',
+  pergamum: 'The Spartan commander Thibron takes over the survivors and leads them against Persian governors.',
+};
