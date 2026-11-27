@@ -10,7 +10,7 @@ A full-viewport globe and illustrated timeline of Xenophon’s *Anabasis*. Fifte
 - Select a route phase, map pin, book-band stop, or the journey scrubber to see the corresponding scene. Use **Previous**, **Next stop**, or **Play** to travel in order. Playback traces each incoming leg, and its settings offer speed and camera-follow controls. Each selected stop has a shareable URL.
 - Open **Layers** to toggle the expedition, terrain relief, approximate political outlines, satrapies and seats, nearby peoples and cities, place names, or the geographic grid.
 - With the map focused, use the arrow keys to rotate the globe. With a timeline stop focused, use the left and right arrows to step between stops, or Home and End to jump to the first or last scene.
-- Open **Passage & image credit** to find the relevant passage from Xenophon, the location’s level of certainty, and the illustration’s source.
+- Open **Details** on the scene card for the full image and story. **Passages & image credit** lists Xenophon’s passages, location certainty, and the illustration’s source.
 
 ## Run locally
 

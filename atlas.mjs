@@ -3,7 +3,7 @@ import { captions } from './captions.mjs';
 import { scenes } from './scenes.mjs';
 import { mapLabels, rivers, routeWaypoints, uncertainLegs } from './map-data.mjs';
 import { createGlobe, project } from './globe.mjs?v=2';
-import { makeTimeline } from './timeline.mjs?v=2';
+import { makeTimeline } from './timeline.mjs?v=3';
 import { createPlayback } from './playback.mjs';
 import { addHistoricalLayer } from './historical-layer.mjs';
 import { historicalSources } from './historical-data.mjs';
@@ -301,72 +301,84 @@ function setupPhases() {
   });
 }
 
-function renderScene(stop) {
-  const scene = scenes[stop.id];
+function bookFor(stop) {
+  return ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][Number(stop.book[0]) - 1];
+}
+
+function placeAndBook(stop) {
+  return `${stop.region} · Book ${bookFor(stop)}`;
+}
+
+function sceneFigure(scene) {
   const figure = html('figure', 'scene');
   const image = html('img', scene.contain ? 'contain' : '');
   image.src = `./assets/${scene.file}`;
   image.alt = scene.alt;
   image.decoding = 'async';
-  const caption = html('figcaption', '', scene.caption);
-  const enlarge = html('button', 'scene-enlarge');
-  enlarge.type = 'button';
-  enlarge.setAttribute('aria-label', `View image for ${stop.name}`);
-  enlarge.append(image);
-  enlarge.addEventListener('click', () => {
-    imageViewer.querySelector('h2').textContent = stop.name;
-    const fullImage = imageViewer.querySelector('img');
-    fullImage.src = image.src;
-    fullImage.alt = scene.alt;
-    imageViewer.querySelector('figcaption').textContent = scene.caption;
-    setPlaying(false);
-    imageViewer.showModal();
-  });
-  figure.append(enlarge, caption);
+  figure.append(image, html('figcaption', '', scene.caption));
   return figure;
 }
 
-function renderStory(stop, i) {
-  const scene = scenes[stop.id];
-  const romanBook = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][Number(stop.book[0]) - 1];
-  const place = html('h2', 'stop-name', stop.name);
-  place.id = 'stop-title';
-  const details = html('details', 'stop-notes');
-  const source = html('p', 'text-citation', `Xenophon, Anabasis ${stop.book}`);
+function passageNotes(stop, scene) {
+  const notes = html('details', 'stop-notes');
+  const citation = html('p', 'text-citation', `Xenophon, Anabasis ${stop.book}`);
   const chapters = new Set([...stop.book.matchAll(/\b([1-7])\.(\d+)\.\d+/g)]
     .map(([, book, chapter]) => `${book}.${chapter}`));
-  details.addEventListener('toggle', () => {
-    if (details.open) setPlaying(false);
-  });
-  const passages = html('div', 'passage-links');
+  const links = html('div', 'passage-links');
   for (const reference of chapters) {
     const [book, chapter] = reference.split('.');
     const url = stop.source.replace(/Book_\d+\/Chapter_\d+$/, `Book_${book}/Chapter_${chapter}`);
-    passages.append(link(`Read ${reference}`, url));
+    links.append(link(`Read ${reference}`, url));
   }
-  const imageCredit = html('p', 'image-credit', 'Image ');
-  imageCredit.append(link(scene.credit, scene.source));
-  if (scene.licenseUrl) {
-    imageCredit.append(' · ', link(scene.licenseName, scene.licenseUrl));
-  }
-  details.append(
-    html('summary', '', 'Passage & image credit'),
-    html('p', '', stop.detail),
+  const credit = html('p', 'image-credit', 'Image ');
+  credit.append(link(scene.credit, scene.source));
+  if (scene.licenseUrl) credit.append(' · ', link(scene.licenseName, scene.licenseUrl));
+  notes.append(
+    html('summary', '', 'Passages & image credit'),
     html('p', '', `Location ${stop.certainty.toLowerCase()}`),
-    source,
-    passages,
-    imageCredit,
+    citation,
+    links,
+    credit,
   );
+  return notes;
+}
+
+function openScene(stop) {
+  setPlaying(false);
+  const scene = scenes[stop.id];
+  find('#scene-viewer-region').textContent = placeAndBook(stop);
+  find('#image-viewer-title').textContent = stop.name;
+  const image = imageViewer.querySelector('img');
+  image.src = `./assets/${scene.file}`;
+  image.alt = scene.alt;
+  imageViewer.querySelector('figcaption').textContent = scene.caption;
+  find('#scene-viewer-copy').replaceChildren(
+    html('h3', '', stop.title),
+    html('p', '', stop.summary),
+    html('p', '', stop.detail),
+    passageNotes(stop, scene),
+  );
+  imageViewer.scrollTop = 0;
+  imageViewer.showModal();
+}
+
+function renderStory(stop, i) {
+  const title = html('h2', 'stop-name', stop.name);
+  title.id = 'stop-title';
   const copy = html('div', 'story-copy');
   copy.append(
-    html('p', 'stop-region', `${stop.region} · Book ${romanBook}`),
-    place,
+    html('p', 'stop-region', placeAndBook(stop)),
+    title,
     html('p', 'stop-title', stop.title),
     html('p', 'stop-summary', captions[stop.id]),
-    details,
   );
-  storyContent.replaceChildren(renderScene(stop), copy);
-  find('#timeline-book').textContent = `Book ${romanBook}`;
+  const expand = html('button', 'scene-action');
+  expand.type = 'button';
+  expand.setAttribute('aria-label', `Details for ${stop.name}`);
+  expand.append(html('span', 'scene-action-label', 'Details'));
+  expand.addEventListener('click', () => openScene(stop));
+  storyContent.replaceChildren(sceneFigure(scenes[stop.id]), copy, expand);
+  find('#timeline-book').textContent = `Book ${bookFor(stop)}`;
   find('#stop-counter').textContent = `${String(i + 1).padStart(2, '0')} / ${stops.length}`;
   previousButton.disabled = i === 0;
   nextButton.disabled = i === stops.length - 1;
@@ -848,6 +860,12 @@ for (const source of historicalSources) {
   citation.title = source.note;
   find('#historical-links').append(citation);
 }
+imageViewer.addEventListener('click', event => {
+  if (event.target !== imageViewer) return;
+  const box = imageViewer.getBoundingClientRect();
+  if (event.clientX < box.left || event.clientX > box.right
+    || event.clientY < box.top || event.clientY > box.bottom) imageViewer.close();
+});
 window.addEventListener('hashchange', selectFromHash);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) setPlaying(false);

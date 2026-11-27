@@ -37,11 +37,6 @@ export function makeTimeline(container, stops, phases, onSelect) {
     button.setAttribute('aria-label', book ? `${description}, Book ${book}` : description);
     button.addEventListener('click', () => onSelect(index));
 
-    const number = document.createElement('span');
-    number.className = 'route-timeline__number';
-    number.setAttribute('aria-hidden', 'true');
-    number.textContent = String(index + 1).padStart(2, '0');
-
     const dot = document.createElement('span');
     dot.className = 'route-timeline__dot';
     dot.setAttribute('aria-hidden', 'true');
@@ -50,20 +45,21 @@ export function makeTimeline(container, stops, phases, onSelect) {
     name.className = 'route-timeline__name';
     name.textContent = stop.name;
 
-    button.append(number, dot, name);
+    button.append(dot, name);
     entry.append(button);
     track.append(entry);
-    return { entry, button };
+    return { entry, button, book };
   });
 
-  for (const book of books) {
+  const bands = books.map(book => {
     const band = document.createElement('span');
     band.className = 'route-timeline__book';
     band.style.gridColumn = `span ${book.count}`;
     band.style.setProperty('--timeline-phase', book.color);
     band.textContent = book.name ? `Book ${book.name}` : '';
     bookBands.append(band);
-  }
+    return { name: book.name, band };
+  });
   stage.append(bookBands, track);
   viewport.append(stage);
 
@@ -97,30 +93,46 @@ export function makeTimeline(container, stops, phases, onSelect) {
     if (index !== selectedIndex && entries[index]) onSelect(index);
   });
 
+  function revealStop(index) {
+    if (viewport.scrollWidth <= viewport.clientWidth) return;
+    const view = viewport.getBoundingClientRect();
+    const stop = entries[index].button.getBoundingClientRect();
+    if (stop.left < view.left || stop.right > view.right) {
+      viewport.scrollLeft += stop.left - view.left - (viewport.clientWidth - stop.width) / 2;
+    }
+  }
+
   function select(index, { reveal = true } = {}) {
-    if (!entries[index]) return;
+    const selected = entries[index];
+    if (!selected) return;
     setProgress(0);
     selectedIndex = index;
     range.value = String(index + 1);
-    range.setAttribute('aria-valuetext', `${index + 1} of ${stops.length}, ${stops[index].name}`);
+    const description = `${index + 1} of ${stops.length}, ${stops[index].name}`;
+    range.setAttribute('aria-valuetext', selected.book ? `${description}, Book ${selected.book}` : description);
+
+    const focused = document.activeElement;
+    const tabStop = track.contains(focused) ? focused : selected.button;
 
     entries.forEach(({ entry, button }, position) => {
       const isCurrent = position === index;
-      button.tabIndex = isCurrent ? 0 : -1;
+      button.tabIndex = button === tabStop ? 0 : -1;
       entry.classList.toggle('is-complete', position < index);
       if (isCurrent) button.setAttribute('aria-current', 'step');
       else button.removeAttribute('aria-current');
     });
+    bands.forEach(({ name, band }) => band.classList.toggle('is-current', name === selected.book));
 
-    if (reveal && viewport.scrollWidth > viewport.clientWidth) {
-      const view = viewport.getBoundingClientRect();
-      const stop = entries[index].button.getBoundingClientRect();
-      if (stop.left < view.left || stop.right > view.right) {
-        const offset = stop.left - view.left - (viewport.clientWidth - stop.width) / 2;
-        viewport.scrollLeft += offset;
-      }
-    }
+    if (reveal && tabStop === selected.button) revealStop(index);
   }
+
+  track.addEventListener('focusout', event => {
+    const selected = entries[selectedIndex].button;
+    if (track.contains(event.relatedTarget) || event.target === selected) return;
+    event.target.tabIndex = -1;
+    selected.tabIndex = 0;
+    revealStop(selectedIndex);
+  });
 
   track.addEventListener('keydown', event => {
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;

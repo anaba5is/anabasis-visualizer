@@ -353,24 +353,6 @@ button:focus-visible, a:focus-visible, summary:focus-visible, section:focus-visi
   .map-scale { inset: auto .55rem .6rem auto; }
 }
 
-.scene-enlarge { display: block; width: 100%; position: relative; padding: 0; border: 0; background: none; cursor: zoom-in; }
-.scene-enlarge:focus-visible { outline-offset: -3px; }
-.scene-enlarge::after {
-  content: "+";
-  display: grid;
-  place-items: center;
-  position: absolute;
-  bottom: .33rem;
-  right: .33rem;
-  width: 1.4rem;
-  height: 1.4rem;
-  border: 1px solid #f5ecd496;
-  border-radius: .18rem;
-  background: #243834dd;
-  color: #fff7e5;
-  font: 1rem/1 var(--body);
-  pointer-events: none;
-}
 .image-viewer {
   width: min(65rem, 92vw);
   max-height: 92dvh;

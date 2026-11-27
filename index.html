@@ -8,11 +8,11 @@
   <title>Anabasis Visualizer</title>
   <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
   <link rel="preload" href="./assets/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="./styles.css">
-  <link rel="stylesheet" href="./timeline.css?v=2">
+  <link rel="stylesheet" href="./styles.css?v=3">
+  <link rel="stylesheet" href="./timeline.css?v=3">
   <link rel="stylesheet" href="./fullscreen.css?v=2">
-  <link rel="stylesheet" href="./glass.css">
-  <script type="module" src="./atlas.mjs?v=2"></script>
+  <link rel="stylesheet" href="./glass.css?v=3">
+  <script type="module" src="./atlas.mjs?v=3"></script>
 </head>
 <body>
   <a class="skip-link" href="#timeline">Skip to the timeline</a>
@@ -136,15 +136,19 @@
       </div>
     </details>
   </main>
-  <dialog class="image-viewer" id="image-viewer" aria-labelledby="image-viewer-title">
+  <dialog class="image-viewer scene-viewer" id="image-viewer" aria-labelledby="image-viewer-title">
     <header>
-      <h2 id="image-viewer-title"></h2>
-      <form method="dialog"><button type="submit">Close image</button></form>
+      <div>
+        <p class="stop-region" id="scene-viewer-region"></p>
+        <h2 id="image-viewer-title"></h2>
+      </div>
+      <form method="dialog"><button type="submit" aria-label="Close scene" autofocus>Done</button></form>
     </header>
     <figure>
       <img alt="">
       <figcaption></figcaption>
     </figure>
+    <div class="scene-viewer-copy" id="scene-viewer-copy"></div>
   </dialog>
 </body>
 </html>

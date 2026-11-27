@@ -31,3 +31,7 @@ Keep the route visible when the timeline changes. Offer a consistent route overv
 Chronas pairs a map with a fixed bottom timeline, layer controls, and a right-hand panel for selected places. Its links can restore a viewport and a selected item. [Chronas](https://chronas.org/) · [Chronas frontend](https://github.com/Chronasorg/chronas-frontend)
 
 Make timeline, route phases, and pins select the same scene. Place the illustration and passage details at the side on wide screens and below the globe on small screens, so readers keep their orientation while exploring the evidence.
+
+## Glass controls on mobile
+
+Apple's material guidance favors translucent surfaces for controls and stable backgrounds for reading. The visualizer uses dark glass around map controls and the timeline, with a light reading sheet for the full scene. Phone controls respect safe areas, and reduced-transparency settings use a solid material. [Apple materials](https://developer.apple.com/design/human-interface-guidelines/materials) · [Apple touch guidance](https://developer.apple.com/design/tips/) · [WebKit safe areas](https://webkit.org/blog/7929/designing-websites-for-iphone-x/)
