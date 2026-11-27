@@ -2,8 +2,11 @@ import { stops } from './story.mjs';
 import { captions } from './captions.mjs';
 import { scenes } from './scenes.mjs';
 import { mapLabels, rivers, routeWaypoints, uncertainLegs } from './map-data.mjs';
-import { createGlobe, project } from './globe.mjs';
-import { makeTimeline } from './timeline.mjs';
+import { createGlobe, project } from './globe.mjs?v=2';
+import { makeTimeline } from './timeline.mjs?v=2';
+import { createPlayback } from './playback.mjs';
+import { addHistoricalLayer } from './historical-layer.mjs';
+import { historicalSources } from './historical-data.mjs';
 
 const phases = [
   { name: 'March inland', color: '#f1b66f', timelineColor: '#a4662a' },
@@ -50,6 +53,9 @@ const navSources = find('.site-nav a');
 const closeSources = find('#close-sources');
 const fullscreen = find('#fullscreen-toggle');
 const imageViewer = find('#image-viewer');
+const speedControl = find('#playback-speed');
+const followControl = find('#follow-camera');
+const layers = { route: true, terrain: true, borders: true, administration: false, neighbors: false, places: true, grid: true };
 const scaleBar = find('#map-scale');
 const queuedScenes = new Set();
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -72,7 +78,14 @@ let drawFrame;
 let surface;
 let gesture;
 let suppressClickUntil = 0;
-let playTimer;
+let drawHistoricalLayer;
+let routeLayer;
+let markerLayer;
+let namesLayer;
+let trail;
+let tracer;
+let viewAtLastDraw;
+let beatProgress = 0;
 
 function svg(tag, attrs = {}, content = '') {
   const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -123,9 +136,9 @@ function linePath(line, view) {
 
 function setupBase() {
   const base = svg('g', { 'aria-hidden': 'true' });
-  const addGrid = points => {
+  const addGrid = (points, regional = false) => {
     const node = svg('path', { class: 'map-grid' });
-    gridNodes.push({ node, points });
+    gridNodes.push({ node, points, regional });
     base.append(node);
   };
   for (let lon = -180; lon < 180; lon += 15) {
@@ -133,6 +146,12 @@ function setupBase() {
   }
   for (let lat = -75; lat <= 75; lat += 15) {
     addGrid(Array.from({ length: 181 }, (_, step) => [-180 + step * 2, lat]));
+  }
+  for (let lon = 20; lon <= 55; lon += 5) {
+    addGrid(Array.from({ length: 25 }, (_, step) => [lon, 24 + step]), true);
+  }
+  for (let lat = 25; lat <= 50; lat += 5) {
+    addGrid(Array.from({ length: 39 }, (_, step) => [18 + step, lat]), true);
   }
   for (const river of rivers) {
     const node = svg('path', { class: 'map-river' });
@@ -153,6 +172,17 @@ function setupBase() {
   map.append(base);
 }
 
+function distances(points) {
+  const offsets = [0];
+  for (let i = 1; i < points.length; i++) {
+    const [lon, lat] = points[i - 1];
+    const [nextLon, nextLat] = points[i];
+    const meridian = Math.cos((lat + nextLat) * Math.PI / 360);
+    offsets.push(offsets[i - 1] + Math.hypot((nextLon - lon) * meridian, nextLat - lat));
+  }
+  return offsets;
+}
+
 function setupRoute() {
   const legs = svg('g', { 'aria-hidden': 'true' });
   for (let i = 1; i < stops.length; i++) {
@@ -163,9 +193,36 @@ function setupRoute() {
     const line = svg('path', { class: `route-path${dash}` });
     line.style.setProperty('--phase', phaseByName.get(stop.phase).color);
     legs.append(shadow, line);
-    routeNodes[i] = { shadow, line, points };
+    routeNodes[i] = { shadow, line, points, offsets: distances(points) };
   }
+  trail = svg('path', { class: 'route-progress', visibility: 'hidden' });
+  tracer = svg('circle', { class: 'route-tracer', r: 3.1, visibility: 'hidden' });
+  legs.append(trail, tracer);
+  routeLayer = legs;
   map.append(legs);
+}
+
+function drawTrail(view = viewAtLastDraw) {
+  const leg = routeNodes[selectedIndex];
+  if (!view || !layers.route || !leg || beatProgress <= 0) {
+    trail.setAttribute('visibility', 'hidden');
+    tracer.setAttribute('visibility', 'hidden');
+    return;
+  }
+  const target = beatProgress * leg.offsets.at(-1);
+  let end = leg.offsets.findIndex(offset => offset >= target);
+  if (end < 1) end = leg.points.length - 1;
+  const start = end - 1;
+  const stepLength = leg.offsets[end] - leg.offsets[start];
+  const local = stepLength ? (target - leg.offsets[start]) / stepLength : 0;
+  const head = leg.points[start].map((value, index) => value + (leg.points[end][index] - value) * local);
+  const position = project(head, view);
+  trail.classList.toggle('uncertain', uncertainLegs.has(stops[selectedIndex].id));
+  trail.setAttribute('d', linePath([...leg.points.slice(0, end), head], view));
+  trail.setAttribute('visibility', 'visible');
+  tracer.setAttribute('visibility', position.visible ? 'visible' : 'hidden');
+  tracer.setAttribute('cx', position.x);
+  tracer.setAttribute('cy', position.y);
 }
 
 function setupMarkers() {
@@ -224,6 +281,8 @@ function setupMarkers() {
     markerNodes.push(marker);
     labelNodes.push(label);
   });
+  markerLayer = markers;
+  namesLayer = labels;
   map.append(markers, labels);
 }
 
@@ -276,6 +335,9 @@ function renderStory(stop, i) {
   const source = html('p', 'text-citation', `Xenophon, Anabasis ${stop.book}`);
   const chapters = new Set([...stop.book.matchAll(/\b([1-7])\.(\d+)\.\d+/g)]
     .map(([, book, chapter]) => `${book}.${chapter}`));
+  details.addEventListener('toggle', () => {
+    if (details.open) setPlaying(false);
+  });
   const passages = html('div', 'passage-links');
   for (const reference of chapters) {
     const [book, chapter] = reference.split('.');
@@ -304,6 +366,7 @@ function renderStory(stop, i) {
     details,
   );
   storyContent.replaceChildren(renderScene(stop), copy);
+  find('#timeline-book').textContent = `Book ${romanBook}`;
   find('#stop-counter').textContent = `${String(i + 1).padStart(2, '0')} / ${stops.length}`;
   previousButton.disabled = i === 0;
   nextButton.disabled = i === stops.length - 1;
@@ -323,9 +386,12 @@ function bookmark(i) {
 }
 
 function chooseStop(i) {
+  if (!stops[i]) return;
   if (awaitingIntro) setMode('route');
   setPlaying(false);
   selectStop(i);
+  playback.reset(beatDuration(i));
+  syncPlayButton(false);
 }
 
 function selectStop(i, { updateHash = true, announce = true, move = true } = {}) {
@@ -348,31 +414,57 @@ function selectStop(i, { updateHash = true, announce = true, move = true } = {})
   timeline.select(i);
   if (move && mode !== 'route') {
     goTo({ lon: stop.coords[0], lat: stop.coords[1], scale: camera.scale });
-  } else if (move && playTimer) {
-    goTo({
-      lon: routeCenter.lon + (stop.coords[0] - routeCenter.lon) * .18,
-      lat: routeCenter.lat + (stop.coords[1] - routeCenter.lat) * .18,
-      scale: 1,
-    });
   }
   queueDraw();
   if (updateHash) bookmark(i);
   if (announce) announcement.textContent = `Stop ${i + 1} of ${stops.length}. ${stop.name}. ${stop.title}`;
 }
 
-function setPlaying(playing) {
-  clearInterval(playTimer);
-  playTimer = undefined;
-  playButton.setAttribute('aria-label', playing ? 'Pause journey' : 'Play journey');
+function beatDuration(i = selectedIndex) {
+  const time = ['cunaxa', 'mount-theches', 'pergamum'].includes(stops[i].id) ? 7200 : 5800;
+  return time / Number(speedControl.value);
+}
+
+function syncPlayButton(playing) {
+  const finished = selectedIndex === stops.length - 1 && playback.getProgress() >= 1;
+  const label = playing ? 'Pause' : finished ? 'Replay' : 'Play';
+  playButton.setAttribute('aria-label', `${label} journey`);
   playButton.firstElementChild.textContent = playing ? 'Ⅱ' : '▶';
-  find('#play-label').textContent = playing ? 'Pause' : 'Play';
-  if (!playing) return;
-  if (awaitingIntro) setMode('route');
-  if (selectedIndex === stops.length - 1) selectStop(0);
-  playTimer = setInterval(() => {
-    selectStop(selectedIndex + 1);
-    if (selectedIndex === stops.length - 1) setPlaying(false);
-  }, 4600);
+  find('#play-label').textContent = label;
+}
+
+function followLeg(i) {
+  if (!followControl.checked) return;
+  const points = routeNodes[i]?.points ?? [stops[i].coords];
+  const [startLon, startLat] = points[0];
+  const [endLon, endLat] = points.at(-1);
+  const extent = Math.max(
+    ...points.map(([lon, lat]) => Math.hypot((lon - endLon) * .8, lat - endLat)),
+  );
+  setMode('free');
+  goTo({
+    lon: startLon + (endLon - startLon) * .55,
+    lat: startLat + (endLat - startLat) * .55,
+    scale: clamp(1.5 - extent * .042, 1.04, 1.5),
+  }, { duration: Math.min(1300, beatDuration(i) * .3) });
+}
+
+function setPlaying(playing) {
+  if (!playing) {
+    if (playback.isPlaying()) {
+      playback.pause();
+      stopCameraAnimation();
+      queueDraw();
+    }
+    return;
+  }
+  const progress = playback.getProgress();
+  if (selectedIndex === stops.length - 1 && progress === 1) {
+    selectStop(0, { move: false });
+    playback.reset(beatDuration(0));
+  }
+  playback.play(beatDuration());
+  followLeg(selectedIndex);
 }
 
 function cameraFrame() {
@@ -418,20 +510,25 @@ function draw() {
   const view = getView();
   if (!view.width || !view.height) return;
   map.setAttribute('viewBox', `0 0 ${view.width} ${view.height}`);
-  surface.draw(view);
-  for (const { node, points } of gridNodes) {
-    node.setAttribute('d', view.scale < .52 ? linePath(points, view) : '');
+  viewAtLastDraw = view;
+  surface.draw({ ...view, terrain: layers.terrain });
+  drawHistoricalLayer(view, layers, layers.route ? project(stops[selectedIndex].coords, view) : null);
+  routeLayer.style.display = layers.route ? '' : 'none';
+  markerLayer.style.display = layers.route ? '' : 'none';
+  namesLayer.style.display = layers.route && layers.places ? '' : 'none';
+  for (const { node, points, regional } of gridNodes) {
+    node.setAttribute('d', layers.grid && regional === (view.scale >= .52) ? linePath(points, view) : '');
   }
   for (const { node, lines } of riverNodes) {
     node.setAttribute('d', view.scale > .48 ? lines.map(line => linePath(line, view)).join('') : '');
   }
   for (const { node, coords } of mapLabelNodes) {
     const { x, y, visible } = project(coords, view);
-    node.setAttribute('visibility', visible && view.scale > .56 ? 'visible' : 'hidden');
+    node.setAttribute('visibility', visible && layers.places && view.scale > .56 ? 'visible' : 'hidden');
     node.setAttribute('x', x);
     node.setAttribute('y', y);
   }
-  for (const { shadow, line, points } of routeNodes.slice(1)) {
+  for (const { shadow, line, points } of layers.route ? routeNodes.slice(1) : []) {
     const d = linePath(points, view);
     shadow.setAttribute('d', d);
     line.setAttribute('d', d);
@@ -449,6 +546,7 @@ function draw() {
     labelNodes[i].setAttribute('y', y + dy);
     labelNodes[i].setAttribute('visibility', inFrame && (view.scale > .5 || i === selectedIndex) ? 'visible' : 'hidden');
   });
+  drawTrail(view);
   scaleBar.hidden = view.scale < .5;
   if (!scaleBar.hidden) {
     const kilometers = view.radius > 1750 ? 200 : 500;
@@ -468,7 +566,7 @@ function stopCameraAnimation() {
   animation = undefined;
 }
 
-function goTo(target) {
+function goTo(target, { duration = 720 } = {}) {
   stopCameraAnimation();
   if (reducedMotion.matches) {
     Object.assign(camera, target);
@@ -481,7 +579,7 @@ function goTo(target) {
   const deltaLat = target.lat - origin.lat;
   const logScale = Math.log(target.scale / origin.scale);
   const animate = now => {
-    const progress = clamp((now - start) / 720, 0, 1);
+    const progress = clamp((now - start) / duration, 0, 1);
     const t = progress * progress * (3 - 2 * progress);
     camera.lon = wrapLon(origin.lon + deltaLon * t);
     camera.lat = origin.lat + deltaLat * t;
@@ -507,6 +605,7 @@ function setMode(nextMode) {
 }
 
 function changeZoom(factor, { animate = true } = {}) {
+  setPlaying(false);
   const scale = clamp(camera.scale * factor, globeScale(), 2.85);
   setMode('free');
   if (animate) {
@@ -577,6 +676,7 @@ function keyboardGlobe(event) {
   const movement = movements[event.key];
   if (!movement) return;
   event.preventDefault();
+  setPlaying(false);
   stopCameraAnimation();
   setMode('free');
   camera.lon = wrapLon(camera.lon + movement[0]);
@@ -591,15 +691,33 @@ function selectFromHash() {
   if (index === undefined) return false;
   setPlaying(false);
   selectStop(index, { updateHash: false });
+  playback.reset(beatDuration(index));
+  syncPlayButton(false);
   return true;
 }
 
 surface = createGlobe(find('#globe-canvas'));
 setupBase();
+drawHistoricalLayer = addHistoricalLayer(map);
 setupRoute();
 setupMarkers();
 setupPhases();
 const timeline = makeTimeline(find('#stop-timeline'), stops, phases, chooseStop);
+const playback = createPlayback({
+  onAdvance() {
+    if (selectedIndex === stops.length - 1) return false;
+    selectStop(selectedIndex + 1, { move: false });
+    playback.setDuration(beatDuration());
+    followLeg(selectedIndex);
+    return true;
+  },
+  onProgress(fraction) {
+    beatProgress = fraction;
+    timeline.setProgress(fraction);
+    drawTrail();
+  },
+  onStateChange: syncPlayButton,
+});
 if (location.hash.startsWith('#stop=') && indexById.has(location.hash.slice(6))) {
   awaitingIntro = false;
   mode = 'route';
@@ -621,12 +739,23 @@ queueDraw();
 
 previousButton.addEventListener('click', () => chooseStop(selectedIndex - 1));
 nextButton.addEventListener('click', () => chooseStop(selectedIndex + 1));
-playButton.addEventListener('click', () => setPlaying(!playTimer));
+playButton.addEventListener('click', () => setPlaying(!playback.isPlaying()));
+speedControl.addEventListener('change', () => playback.setDuration(beatDuration()));
+followControl.addEventListener('change', () => {
+  if (playback.isPlaying()) {
+    if (followControl.checked) followLeg(selectedIndex);
+    else stopCameraAnimation();
+  }
+});
 zoomIn.addEventListener('click', () => changeZoom(1.36));
 zoomOut.addEventListener('click', () => changeZoom(1 / 1.36));
-reset.addEventListener('click', () => setMode('route'));
-viewRoute.addEventListener('click', () => setMode('route'));
-viewGlobe.addEventListener('click', () => setMode('globe'));
+function showPreset(mode) {
+  setPlaying(false);
+  setMode(mode);
+}
+reset.addEventListener('click', () => showPreset('route'));
+viewRoute.addEventListener('click', () => showPreset('route'));
+viewGlobe.addEventListener('click', () => showPreset('globe'));
 sceneToggle.addEventListener('click', () => {
   storyPanel.hidden = !storyPanel.hidden;
   sceneToggle.setAttribute('aria-expanded', String(!storyPanel.hidden));
@@ -646,6 +775,7 @@ mapFrame.addEventListener('wheel', event => {
 }, { passive: false });
 navSources.addEventListener('click', event => {
   event.preventDefault();
+  setPlaying(false);
   sources.open = true;
   closeSources.focus({ preventScroll: true });
 });
@@ -678,6 +808,45 @@ if (document.fullscreenEnabled && document.documentElement.requestFullscreen) {
     fullscreen.title = label;
     resizeMap();
   });
+}
+function connectPopover(trigger, panel) {
+  function dismiss(restoreFocus = false) {
+    if (panel.hidden) return;
+    panel.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) trigger.focus({ preventScroll: true });
+  }
+  trigger.addEventListener('click', () => {
+    if (!panel.hidden) {
+      dismiss();
+      return;
+    }
+    panel.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    panel.querySelector('input, select')?.focus({ preventScroll: true });
+  });
+  panel.addEventListener('keydown', event => {
+    if (event.key === 'Escape') dismiss(true);
+  });
+  document.addEventListener('pointerdown', event => {
+    if (!panel.contains(event.target) && !trigger.contains(event.target)) dismiss();
+  });
+}
+
+const layerMenu = find('#layers-panel');
+connectPopover(find('#layers-toggle'), layerMenu);
+connectPopover(find('#playback-settings-toggle'), find('#playback-settings'));
+layerMenu.addEventListener('change', event => {
+  if (!(event.target instanceof HTMLInputElement)) return;
+  const { layer } = event.target.dataset;
+  layers[layer] = event.target.checked;
+  if ((layer === 'administration' || layer === 'neighbors') && layers[layer] && camera.scale < .34) showPreset('route');
+  queueDraw();
+});
+for (const source of historicalSources) {
+  const citation = link(source.name, source.url);
+  citation.title = source.note;
+  find('#historical-links').append(citation);
 }
 window.addEventListener('hashchange', selectFromHash);
 document.addEventListener('visibilitychange', () => {

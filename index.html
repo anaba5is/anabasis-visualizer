@@ -4,14 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="Explore the route of Xenophon’s Anabasis in an illustrated, source-linked map and timeline.">
-  <meta name="theme-color" content="#f5efe4">
+  <meta name="theme-color" content="#142422">
   <title>Anabasis Visualizer</title>
   <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
   <link rel="preload" href="./assets/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="./styles.css">
-  <link rel="stylesheet" href="./timeline.css">
-  <link rel="stylesheet" href="./fullscreen.css">
-  <script type="module" src="./atlas.mjs"></script>
+  <link rel="stylesheet" href="./timeline.css?v=2">
+  <link rel="stylesheet" href="./fullscreen.css?v=2">
+  <link rel="stylesheet" href="./glass.css">
+  <script type="module" src="./atlas.mjs?v=2"></script>
 </head>
 <body>
   <a class="skip-link" href="#timeline">Skip to the timeline</a>
@@ -44,6 +45,7 @@
               <button type="button" id="view-route" aria-pressed="false">Route</button>
               <button type="button" id="view-globe" aria-pressed="true">Globe</button>
               <button type="button" id="scene-toggle" aria-controls="story-panel" aria-expanded="true">Scene</button>
+              <button type="button" id="layers-toggle" aria-controls="layers-panel" aria-expanded="false">Layers</button>
             </div>
             <span class="map-scale" id="map-scale" aria-hidden="true"></span>
             <span class="map-north" aria-hidden="true">N<span></span></span>
@@ -54,20 +56,44 @@
             <span class="globe-tip" id="globe-instructions">Drag to rotate<span class="sr-only">, or use arrow keys when focused</span></span>
           </div>
         </div>
+        <aside class="glass-popover layer-menu" id="layers-panel" aria-labelledby="layers-heading" hidden>
+          <h2 id="layers-heading">Map layers</h2>
+          <label><input type="checkbox" data-layer="route" checked> Expedition</label>
+          <label><input type="checkbox" data-layer="terrain" checked> Terrain relief</label>
+          <label><input type="checkbox" data-layer="borders" checked> Historical borders</label>
+          <label><input type="checkbox" data-layer="administration"> Satrapies and seats</label>
+          <label><input type="checkbox" data-layer="neighbors"> Nearby peoples and cities</label>
+          <label><input type="checkbox" data-layer="places" checked> Place names</label>
+          <label><input type="checkbox" data-layer="grid" checked> Latitude and longitude</label>
+          <p>Territories around 401 BCE are approximate. Administrative markers indicate locations.</p>
+        </aside>
         <section class="timeline-panel" id="timeline" tabindex="-1" aria-labelledby="timeline-heading">
           <div class="timeline-header">
             <div class="timeline-title">
               <h2 id="timeline-heading">Timeline</h2>
               <span id="stop-counter" aria-hidden="true"></span>
+              <span id="timeline-book" aria-hidden="true"></span>
             </div>
             <div class="story-nav" role="group" aria-label="Step through the timeline">
               <button type="button" id="play-route" aria-label="Play journey"><span aria-hidden="true">▶</span> <span id="play-label">Play</span></button>
               <button type="button" id="previous-stop" aria-label="Previous stop">Prev<span class="wide-button-text">ious</span></button>
               <button type="button" id="next-stop" aria-label="Next stop">Next<span class="wide-button-text"> stop</span></button>
+              <button type="button" id="playback-settings-toggle" class="icon-button" aria-controls="playback-settings" aria-expanded="false" aria-label="Playback settings" title="Playback settings">···</button>
             </div>
           </div>
           <div id="stop-timeline"></div>
         </section>
+        <aside class="glass-popover playback-menu" id="playback-settings" aria-label="Playback settings" hidden>
+          <label for="playback-speed">Speed
+            <select id="playback-speed">
+              <option value="0.75">0.75×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+          </label>
+          <label><input type="checkbox" id="follow-camera" checked> Follow the journey</label>
+        </aside>
         <article class="story-panel" id="story-panel" aria-labelledby="stop-title">
           <div id="story-content"></div>
         </article>
@@ -92,6 +118,11 @@
             <a href="https://www.naturalearthdata.com/about/terms-of-use/">Basemap</a>
             <a href="https://doi.org/10.1017/S0066154623000054">Theches study</a>
           </div>
+        </article>
+        <article id="historical-notes">
+          <h2>Historical layers</h2>
+          <p>Territory outlines are reconstructions around 401 BCE. Satrapies and administrative seats are shown as points. The underlying terrain is modern.</p>
+          <div class="note-links" id="historical-links"><a href="https://github.com/anaba5is/anabasis-visualizer/blob/main/historical-sources.md">Territories and places</a></div>
         </article>
         <article>
           <h2>Earlier maps</h2>

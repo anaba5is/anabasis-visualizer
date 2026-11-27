@@ -1,10 +1,14 @@
 const RADIANS = Math.PI / 180;
-// Natural Earth 1:50m shaded relief and physical vectors, public domain.
-// This equirectangular texture stores relief in RGB and land coverage in alpha.
+// Natural Earth shaded relief and physical vectors, public domain. The global
+// texture uses 1:50m data. The regional texture uses 1:10m data at native relief
+// resolution, with a finer shoreline mask in the alpha channel.
 const TEXTURE_URL = new URL('./assets/globe-relief.webp', import.meta.url).href;
-const REGIONAL_TEXTURE_URL = new URL('./assets/anabasis-relief.webp', import.meta.url).href;
-// West, south, east, north. This is the crop in scripts/build-map.py.
-const REGIONAL_BOUNDS = [25, 29, 50, 44];
+const REGIONAL_TEXTURE_URL = new URL('./assets/globe-detail.webp', import.meta.url).href;
+// West, south, east, north. This is the crop in scripts/build-globe-detail.py.
+const REGIONAL_BOUNDS = [20, 25, 52, 47];
+const DETAIL_MIN_RADIUS = 450;
+const DETAIL_FULL_RADIUS = 1000;
+const DETAIL_BLEND_DEGREES = 1.6;
 
 export function project([longitude, latitude], camera) {
   const lat = latitude * RADIANS;
@@ -50,6 +54,7 @@ precision highp float;
 uniform sampler2D earth;
 uniform sampler2D regionalEarth;
 uniform bool regionalLoaded;
+uniform bool terrainEnabled;
 uniform vec4 regionalBounds;
 uniform float height;
 uniform vec2 origin;
@@ -92,24 +97,23 @@ void main() {
 #else
   vec4 sampleColor = texture2D(earth, uv);
 #endif
-  float detailZoom = smoothstep(430.0, 900.0, min(radius.x, radius.y));
-  if (regionalLoaded && detailZoom > 0.0 && sampleColor.a > 0.0) {
+  float detailZoom = smoothstep(${DETAIL_MIN_RADIUS}.0, ${DETAIL_FULL_RADIUS}.0, min(radius.x, radius.y));
+  if (regionalLoaded && detailZoom > 0.0) {
     vec2 geographic = vec2(longitude, latitude) * (180.0 / PI);
     vec2 local = geographic - regionalBounds.xy;
     vec2 span = regionalBounds.zw - regionalBounds.xy;
     vec2 toEdge = min(local, span - local);
-    float blend = detailZoom * smoothstep(0.0, 1.0, min(toEdge.x, toEdge.y));
+    float blend = detailZoom * smoothstep(0.0, ${DETAIL_BLEND_DEGREES}, min(toEdge.x, toEdge.y));
     if (blend > 0.0) {
       vec2 texel = local / span;
       vec4 detail = texture2D(regionalEarth, vec2(texel.x, 1.0 - texel.y));
-      float offset = pow(detail.a * (255.0 / 1.6), 1.0 / 1.14);
-      float detailGray = (206.0 + (detail.r > 0.5 ? offset : -offset)) / 255.0;
-      sampleColor.r = mix(sampleColor.r, detailGray, blend);
+      sampleColor = mix(sampleColor, detail, blend);
     }
   }
 
   float illumination = max(0.0, dot(normal, incidentLight));
-  float landTone = clamp(0.50 + (sampleColor.r - 0.78) * 2.55, 0.0, 1.0);
+  float gray = terrainEnabled && sampleColor.a > 0.0 ? sampleColor.r / sampleColor.a : 206.0 / 255.0;
+  float landTone = clamp(0.50 + (gray - 0.78) * 2.55, 0.0, 1.0);
   vec3 stone = mix(vec3(0.35, 0.33, 0.29), vec3(0.81, 0.74, 0.60), landTone);
   vec3 ocean = mix(vec3(0.058, 0.118, 0.133), vec3(0.104, 0.207, 0.222), z);
   vec3 surface = mix(ocean, stone, sampleColor.a) * (0.79 + 0.25 * illumination);
@@ -159,7 +163,7 @@ function createWebGLRenderer(canvas, output, onContextLost) {
   gl.useProgram(program);
 
   const uniforms = Object.fromEntries(
-    ['height', 'origin', 'radius', 'east', 'north', 'center', 'regionalLoaded', 'regionalBounds']
+    ['height', 'origin', 'radius', 'east', 'north', 'center', 'regionalLoaded', 'terrainEnabled', 'regionalBounds']
       .map(name => [name, gl.getUniformLocation(program, name)]),
   );
   const buffer = gl.createBuffer();
@@ -172,6 +176,7 @@ function createWebGLRenderer(canvas, output, onContextLost) {
   const earth = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, earth);
   gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
@@ -190,6 +195,7 @@ function createWebGLRenderer(canvas, output, onContextLost) {
   gl.uniform1i(gl.getUniformLocation(program, 'regionalEarth'), 1);
   gl.uniform4fv(uniforms.regionalBounds, REGIONAL_BOUNDS);
   gl.activeTexture(gl.TEXTURE0);
+  const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
 
   layer.addEventListener('webglcontextlost', event => {
     event.preventDefault();
@@ -199,14 +205,7 @@ function createWebGLRenderer(canvas, output, onContextLost) {
   return {
     setImage(image) {
       if (gl.isContextLost()) return;
-      const maxWidth = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-      let source = image;
-      if (image.width > maxWidth) {
-        source = document.createElement('canvas');
-        source.width = maxWidth;
-        source.height = maxWidth / 2;
-        source.getContext('2d').drawImage(image, 0, 0, source.width, source.height);
-      }
+      const source = fitImage(image, maxTextureSize);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
       if (explicitGradient) {
         gl.generateMipmap(gl.TEXTURE_2D);
@@ -216,7 +215,7 @@ function createWebGLRenderer(canvas, output, onContextLost) {
     setRegionalImage(image) {
       if (gl.isContextLost()) return;
       gl.activeTexture(gl.TEXTURE1);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, fitImage(image, maxTextureSize));
       gl.activeTexture(gl.TEXTURE0);
       gl.uniform1i(uniforms.regionalLoaded, 1);
     },
@@ -241,6 +240,7 @@ function createWebGLRenderer(canvas, output, onContextLost) {
       gl.uniform3fv(uniforms.east, east);
       gl.uniform3fv(uniforms.north, north);
       gl.uniform3fv(uniforms.center, center);
+      gl.uniform1i(uniforms.terrainEnabled, camera.terrain !== false ? 1 : 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       output.clearRect(0, 0, width, height);
       output.drawImage(layer, 0, 0);
@@ -255,13 +255,60 @@ function resize(canvas, width, height) {
   canvas.height = height;
 }
 
+function fitImage(image, maxDimension) {
+  const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+  if (scale === 1) return image;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(image.width * scale);
+  canvas.height = Math.round(image.height * scale);
+  const context = canvas.getContext('2d');
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
 function imagePixels(image) {
   const source = document.createElement('canvas');
   source.width = image.width;
   source.height = image.height;
   const context = source.getContext('2d', { willReadFrequently: true });
   context.drawImage(image, 0, 0);
-  return context.getImageData(0, 0, source.width, source.height);
+  const { data, width, height } = context.getImageData(0, 0, source.width, source.height);
+  // Mirror GL's premultiplication so filtering a coastline doesn't darken it.
+  // The software renderer only requires gray and alpha, not all four channels.
+  const samples = new Uint8Array(width * height * 2);
+  for (let pixel = 0, texel = 0; pixel < data.length; pixel += 4, texel += 2) {
+    const alpha = data[pixel + 3];
+    samples[texel] = Math.round(data[pixel] * alpha / 255);
+    samples[texel + 1] = alpha;
+  }
+  return { samples, width, height };
+}
+
+function blendChannel(samples, a, b, c, d, x, y) {
+  const top = samples[a] + (samples[b] - samples[a]) * x;
+  const bottom = samples[c] + (samples[d] - samples[c]) * x;
+  return Math.round(top + (bottom - top) * y);
+}
+
+function sampleTexture({ samples, width, height }, u, v, wrapLongitude) {
+  const x = u * width - 0.5;
+  const y = v * height - 0.5;
+  const column = Math.floor(x);
+  const row = Math.floor(y);
+  const left = column < 0 ? (wrapLongitude ? width - 1 : 0) : column;
+  const right = column + 1 >= width ? (wrapLongitude ? 0 : width - 1) : column + 1;
+  const top = Math.max(0, row) * width;
+  const bottom = Math.min(height - 1, row + 1) * width;
+  const a = (top + left) * 2;
+  const b = (top + right) * 2;
+  const c = (bottom + left) * 2;
+  const d = (bottom + right) * 2;
+  const xMix = x - column;
+  const yMix = y - row;
+  const gray = blendChannel(samples, a, b, c, d, xMix, yMix);
+  const alpha = blendChannel(samples, a + 1, b + 1, c + 1, d + 1, xMix, yMix);
+  return (gray << 8) | alpha;
 }
 
 function smoothstep(progress) {
@@ -282,7 +329,7 @@ function createSoftwareRenderer(canvas, output) {
       regionalTerrain = imagePixels(image);
     },
     draw(camera) {
-      const scale = Math.min(1, 640 / Math.max(camera.width, camera.height));
+      const scale = Math.min(1, 800 / Math.max(camera.width, camera.height));
       const width = Math.max(1, Math.round(camera.width * scale));
       const height = Math.max(1, Math.round(camera.height * scale));
       resize(canvas, width, height);
@@ -294,9 +341,9 @@ function createSoftwareRenderer(canvas, output) {
       const pixelRadius = Math.min(xScale, yScale) * camera.radius;
       const halo = Math.min(0.085, 36 / pixelRadius);
       const limbWidth = 1.3 / pixelRadius;
-      const detailZoom = regionalTerrain ? smoothstep((pixelRadius - 430) / 470) : 0;
-      const textureWidth = terrain?.width ?? 1;
-      const textureHeight = terrain?.height ?? 1;
+      const detailZoom = regionalTerrain
+        ? smoothstep((pixelRadius - DETAIL_MIN_RADIUS) / (DETAIL_FULL_RADIUS - DETAIL_MIN_RADIUS)) : 0;
+      const terrainEnabled = camera.terrain !== false;
       const [west, south, eastEdge, northEdge] = REGIONAL_BOUNDS;
       const pixels = frame.data;
       pixels.fill(0);
@@ -318,35 +365,37 @@ function createSoftwareRenderer(canvas, output) {
           const z = Math.sqrt(1 - distance);
           let gray = 0;
           let land = 0;
-          if (terrain) {
+          if (terrain || detailZoom > 0) {
             const wx = east[0] * x + north[0] * y + center[0] * z;
             const wy = north[1] * y + center[1] * z;
             const wz = east[2] * x + north[2] * y + center[2] * z;
             const u = 0.5 + Math.atan2(wz, wx) / (2 * Math.PI);
             const v = 0.5 - Math.asin(Math.max(-1, Math.min(1, wy))) / Math.PI;
-            const texel = (Math.min(textureHeight - 1, Math.floor(v * textureHeight)) * textureWidth
-              + Math.floor(u * textureWidth) % textureWidth) * 4;
-            gray = terrain.data[texel] / 255;
-            land = terrain.data[texel + 3] / 255;
-            if (detailZoom > 0 && land > 0) {
+            if (terrain) {
+              const sample = sampleTexture(terrain, u, v, true);
+              gray = sample >>> 8;
+              land = sample & 255;
+            }
+            if (detailZoom > 0) {
               const lon = (u - 0.5) * 360;
               const lat = (0.5 - v) * 180;
-              const blend = detailZoom * smoothstep(Math.min(lon - west, eastEdge - lon, lat - south, northEdge - lat));
+              const edge = Math.min(lon - west, eastEdge - lon, lat - south, northEdge - lat);
+              const blend = detailZoom * smoothstep(edge / DETAIL_BLEND_DEGREES);
               if (blend > 0) {
-                const col = Math.floor(regionalTerrain.width * (lon - west) / (eastEdge - west));
-                const row = Math.floor(regionalTerrain.height * (northEdge - lat) / (northEdge - south));
-                const localTexel = (row * regionalTerrain.width + col) * 4;
-                const sign = regionalTerrain.data[localTexel] > 127 ? 1 : -1;
-                const offset = (regionalTerrain.data[localTexel + 3] / 1.6) ** (1 / 1.14);
-                const detailGray = (206 + sign * offset) / 255;
-                gray += blend * (detailGray - gray);
+                const uLocal = (lon - west) / (eastEdge - west);
+                const vLocal = (northEdge - lat) / (northEdge - south);
+                const local = sampleTexture(regionalTerrain, uLocal, vLocal, false);
+                gray += blend * ((local >>> 8) - gray);
+                land += blend * ((local & 255) - land);
               }
             }
           }
 
           const light = 0.79 + 0.25 * Math.max(0, -0.49 * x + 0.56 * y + 0.67 * z);
-          const stone = Math.max(0, Math.min(1, 0.50 + (gray - 0.78) * 2.55));
+          const shade = terrainEnabled && land > 0 ? gray / land : 206 / 255;
+          const stone = Math.max(0, Math.min(1, 0.50 + (shade - 0.78) * 2.55));
           const rim = 0.40 * (1 - z) ** 3.1;
+          land /= 255;
           const sea = 1 - land;
           pixels[i] = (1 - rim) * light * (sea * (15 + 12 * z) + land * (89 + 118 * stone)) + rim * 69;
           pixels[i + 1] = (1 - rim) * light * (sea * (30 + 23 * z) + land * (84 + 105 * stone)) + rim * 122;
@@ -385,6 +434,7 @@ export function createGlobe(canvas) {
 
   const ready = new Promise(resolve => {
     const image = new Image();
+    image.fetchPriority = 'high';
     image.onload = () => {
       terrain = image;
       hardware?.setImage(image);
@@ -397,6 +447,8 @@ export function createGlobe(canvas) {
   });
 
   const regionalImage = new Image();
+  regionalImage.fetchPriority = 'low';
+  regionalImage.decoding = 'async';
   regionalImage.onload = () => {
     regionalTerrain = regionalImage;
     hardware?.setRegionalImage(regionalImage);
