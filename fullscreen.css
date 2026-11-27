@@ -375,7 +375,20 @@ body > .site-footer { display: none; }
 }
 
 @media (max-height: 28rem) and (min-width: 33rem) {
-  :root { --atlas-mobile-story: 5.1rem; --atlas-timeline: 6.02rem; }
+  :root { --atlas-mobile-story: 5.1rem; --atlas-timeline: 6.16rem; }
+  .masthead.frame { grid-template-columns: minmax(0, 1fr) auto; gap: .44rem; }
+  .masthead .header-period { display: none; }
+  .masthead .wordmark { max-width: 11.2rem; }
+  .masthead .wordmark h1 { font-size: 1.32rem; }
+  .route-controls {
+    z-index: 6;
+    inset: calc(var(--atlas-top) + .34rem) calc(var(--atlas-right) + 4.9rem) auto auto;
+    width: min(24rem, calc(100% - 18rem));
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+  .phase-button { min-height: 1.89rem; font-size: .68rem; }
   .timeline-panel .route-timeline__stop { min-height: 2.96rem; }
   .map-key { inset: auto auto var(--atlas-above-dock) var(--atlas-left); }
   .story-panel { left: auto; width: min(21rem, 48vw); }
