@@ -1,6 +1,4 @@
-export { land, lakes, rivers } from './assets/map-geometry.mjs';
-
-export const mapBounds = { west: 25, east: 50, south: 29, north: 44 };
+export { rivers } from './assets/map-geometry.mjs?v=2';
 
 export const mapLabels = [
   { name: 'Aegean Sea', kind: 'sea', coords: [26.25, 37.31] },

@@ -1,11 +1,12 @@
-import { stops } from './story.mjs';
-import { captions } from './captions.mjs';
+import { stops, journeyChapters } from './story.mjs?v=4';
+import { captions } from './captions.mjs?v=4';
+
 import { scenes } from './scenes.mjs';
-import { mapLabels, rivers, routeWaypoints, uncertainLegs } from './map-data.mjs';
-import { createGlobe, project } from './globe.mjs?v=2';
-import { makeTimeline } from './timeline.mjs?v=3';
+import { mapLabels, rivers, routeWaypoints, uncertainLegs } from './map-data.mjs?v=2';
+import { createGlobe, createProjector } from './globe.mjs?v=4';
+import { makeTimeline } from './timeline.mjs?v=4';
 import { createPlayback } from './playback.mjs';
-import { addHistoricalLayer } from './historical-layer.mjs';
+import { addHistoricalLayer } from './historical-layer.mjs?v=4';
 import { historicalSources } from './historical-data.mjs';
 
 const phases = [
@@ -33,6 +34,16 @@ const labelLayouts = {
 const find = selector => document.querySelector(selector);
 const map = find('#expedition-map');
 const mapFrame = find('.map-frame');
+const masthead = find('.masthead');
+const atlasWindow = find('.atlas-window');
+const intro = find('#journey-intro');
+const mapModes = find('.map-mode');
+const mapTools = find('.map-controls');
+const phoneScene = find('#phone-scene');
+const phoneThumb = find('#phone-thumb-image');
+const phoneStage = find('.phone-stage');
+const phonePlace = find('.phone-place');
+const stationsToggle = find('#stations-toggle');
 const storyContent = find('#story-content');
 const announcement = find('#announcement');
 const previousButton = find('#previous-stop');
@@ -53,11 +64,13 @@ const navSources = find('.site-nav a');
 const closeSources = find('#close-sources');
 const fullscreen = find('#fullscreen-toggle');
 const imageViewer = find('#image-viewer');
+const readerTitle = find('#image-viewer-title');
+const readerPrevious = find('#reader-previous');
+const readerNext = find('#reader-next');
 const speedControl = find('#playback-speed');
 const followControl = find('#follow-camera');
 const layers = { route: true, terrain: true, borders: true, administration: false, neighbors: false, places: true, grid: true };
 const scaleBar = find('#map-scale');
-const queuedScenes = new Set();
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const routeCenter = { lon: 35.5, lat: 37.8 };
 const globeCenter = { lon: 26, lat: 29 };
@@ -86,6 +99,10 @@ let trail;
 let tracer;
 let viewAtLastDraw;
 let beatProgress = 0;
+let frameBounds;
+let lastSurfaceView;
+let lastProjectedView;
+let readerReturnFocus;
 
 function svg(tag, attrs = {}, content = '') {
   const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -127,7 +144,7 @@ function linePath(line, view) {
   let path = '';
   let penDown = false;
   for (const coordinates of line) {
-    const point = project(coordinates, view);
+    const point = view.locate(coordinates);
     if (point.visible) path += `${penDown ? 'L' : 'M'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
     penDown = point.visible;
   }
@@ -142,10 +159,10 @@ function setupBase() {
     base.append(node);
   };
   for (let lon = -180; lon < 180; lon += 15) {
-    addGrid(Array.from({ length: 91 }, (_, step) => [lon, -90 + step * 2]));
+    addGrid(Array.from({ length: 37 }, (_, step) => [lon, -90 + step * 5]));
   }
   for (let lat = -75; lat <= 75; lat += 15) {
-    addGrid(Array.from({ length: 181 }, (_, step) => [-180 + step * 2, lat]));
+    addGrid(Array.from({ length: 73 }, (_, step) => [-180 + step * 5, lat]));
   }
   for (let lon = 20; lon <= 55; lon += 5) {
     addGrid(Array.from({ length: 25 }, (_, step) => [lon, 24 + step]), true);
@@ -216,7 +233,7 @@ function drawTrail(view = viewAtLastDraw) {
   const stepLength = leg.offsets[end] - leg.offsets[start];
   const local = stepLength ? (target - leg.offsets[start]) / stepLength : 0;
   const head = leg.points[start].map((value, index) => value + (leg.points[end][index] - value) * local);
-  const position = project(head, view);
+  const position = view.locate(head);
   trail.classList.toggle('uncertain', uncertainLegs.has(stops[selectedIndex].id));
   trail.setAttribute('d', linePath([...leg.points.slice(0, end), head], view));
   trail.setAttribute('visibility', 'visible');
@@ -252,7 +269,7 @@ function setupMarkers() {
         const x = event.clientX - box.left;
         const y = event.clientY - box.top;
         const nearest = stops.reduce((candidate, place, index) => {
-          const point = project(place.coords, view);
+          const point = view.locate(place.coords);
           const distance = markerNodes[index].getAttribute('visibility') === 'visible'
             ? Math.hypot(point.x - x, point.y - y) : Infinity;
           return distance < candidate.distance ? { index, distance } : candidate;
@@ -312,7 +329,8 @@ function placeAndBook(stop) {
 function sceneFigure(scene) {
   const figure = html('figure', 'scene');
   const image = html('img', scene.contain ? 'contain' : '');
-  image.src = `./assets/${scene.file}`;
+  image.loading = 'lazy';
+  image.src = `./assets/previews/card-${scene.file}`;
   image.alt = scene.alt;
   image.decoding = 'async';
   figure.append(image, html('figcaption', '', scene.caption));
@@ -343,26 +361,53 @@ function passageNotes(stop, scene) {
   return notes;
 }
 
-function openScene(stop) {
-  setPlaying(false);
+function renderReader(stop, i) {
   const scene = scenes[stop.id];
   find('#scene-viewer-region').textContent = placeAndBook(stop);
-  find('#image-viewer-title').textContent = stop.name;
+  readerTitle.textContent = stop.name;
   const image = imageViewer.querySelector('img');
   image.src = `./assets/${scene.file}`;
   image.alt = scene.alt;
   imageViewer.querySelector('figcaption').textContent = scene.caption;
-  find('#scene-viewer-copy').replaceChildren(
-    html('h3', '', stop.title),
-    html('p', '', stop.summary),
-    html('p', '', stop.detail),
-    passageNotes(stop, scene),
-  );
+  const content = document.createDocumentFragment();
+  const chapter = journeyChapters[stop.phase];
+  if (chapter && stops[i - 1]?.phase !== stop.phase) {
+    const opening = html('section', 'reader-context');
+    opening.append(
+      html('h3', '', chapter.title),
+      html('p', '', chapter.synopsis),
+      link(`Read Xenophon ${chapter.book}`, chapter.source),
+    );
+    content.append(opening);
+  }
+  content.append(html('h3', '', stop.title), html('p', '', stop.summary), html('p', '', stop.detail));
+  if (stop.whyItMatters) content.append(html('p', 'reader-takeaway', stop.whyItMatters));
+  content.append(passageNotes(stop, scene));
+  find('#scene-viewer-copy').replaceChildren(content);
+  readerPrevious.disabled = i === 0;
+  readerNext.disabled = i === stops.length - 1;
   imageViewer.scrollTop = 0;
+}
+
+function openScene(trigger) {
+  setPlaying(false);
+  readerReturnFocus = trigger;
+  renderReader(stops[selectedIndex], selectedIndex);
   imageViewer.showModal();
 }
 
+function stepReader(delta) {
+  const next = selectedIndex + delta;
+  if (!stops[next]) return;
+  chooseStop(next);
+  renderReader(stops[next], next);
+  readerTitle.focus({ preventScroll: true });
+}
+
 function renderStory(stop, i) {
+  const book = bookFor(stop);
+  const scene = scenes[stop.id];
+  const chapter = journeyChapters[stop.phase];
   const title = html('h2', 'stop-name', stop.name);
   title.id = 'stop-title';
   const copy = html('div', 'story-copy');
@@ -372,25 +417,25 @@ function renderStory(stop, i) {
     html('p', 'stop-title', stop.title),
     html('p', 'stop-summary', captions[stop.id]),
   );
+  if (chapter) {
+    copy.prepend(html('div', 'card-chapter', chapter.title));
+    storyPanel.style.setProperty('--scene-phase', phaseByName.get(stop.phase).color);
+  }
   const expand = html('button', 'scene-action');
   expand.type = 'button';
-  expand.setAttribute('aria-label', `Details for ${stop.name}`);
-  expand.append(html('span', 'scene-action-label', 'Details'));
-  expand.addEventListener('click', () => openScene(stop));
-  storyContent.replaceChildren(sceneFigure(scenes[stop.id]), copy, expand);
-  find('#timeline-book').textContent = `Book ${bookFor(stop)}`;
+  expand.setAttribute('aria-label', `Read scene for ${stop.name}`);
+  expand.append(html('span', 'scene-action-label', 'Read scene'));
+  expand.addEventListener('click', () => openScene(expand));
+  storyContent.replaceChildren(sceneFigure(scene), copy, expand);
+
+  phoneThumb.src = `./assets/previews/thumb-${scene.file}`;
+  phoneStage.textContent = `Book ${book} · ${i + 1} / ${stops.length}`;
+  phonePlace.textContent = stop.name;
+  phoneScene.setAttribute('aria-label', `Details for ${stop.name}`);
+  find('#timeline-book').textContent = `Book ${book}`;
   find('#stop-counter').textContent = `${String(i + 1).padStart(2, '0')} / ${stops.length}`;
   previousButton.disabled = i === 0;
   nextButton.disabled = i === stops.length - 1;
-}
-
-function preloadScene(i) {
-  const scene = scenes[stops[i]?.id];
-  if (!scene || queuedScenes.has(scene.file)) return;
-  queuedScenes.add(scene.file);
-  const image = new Image();
-  image.fetchPriority = 'low';
-  image.src = `./assets/${scene.file}`;
 }
 
 function bookmark(i) {
@@ -399,7 +444,7 @@ function bookmark(i) {
 
 function chooseStop(i) {
   if (!stops[i]) return;
-  if (awaitingIntro) setMode('route');
+  if (awaitingIntro || !intro.hidden || mode === 'globe') setMode('route');
   setPlaying(false);
   selectStop(i);
   playback.reset(beatDuration(i));
@@ -411,7 +456,6 @@ function selectStop(i, { updateHash = true, announce = true, move = true } = {})
   if (!stop) return;
   selectedIndex = i;
   renderStory(stop, i);
-  preloadScene(i + 1);
   markerNodes.forEach((marker, index) => {
     const here = i === index;
     marker.classList.toggle('selected', here);
@@ -470,6 +514,7 @@ function setPlaying(playing) {
     }
     return;
   }
+  dismissIntro();
   const progress = playback.getProgress();
   if (selectedIndex === stops.length - 1 && progress === 1) {
     selectStop(0, { move: false });
@@ -479,38 +524,60 @@ function setPlaying(playing) {
   followLeg(selectedIndex);
 }
 
-function cameraFrame() {
+function layoutBox(element) {
+  if (element.hidden) return null;
+  const box = element.getBoundingClientRect();
+  return box.width > 2 && box.height > 2 ? box : null;
+}
+
+function measureCameraFrame() {
   const mapBox = mapFrame.getBoundingClientRect();
   const width = mapFrame.clientWidth;
   const height = mapFrame.clientHeight;
-  const padding = clamp(width * .035, 12, 42);
-  const scene = storyPanel.getBoundingClientRect();
-  const landscapePanel = !storyPanel.hidden && width >= 530 && scene.width < width * .56;
-  const lowPanel = !storyPanel.hidden && !landscapePanel;
-  const top = Math.max(0, phaseControls.getBoundingClientRect().bottom - mapBox.top) + 8;
-  const bottom = Math.min(
-    height - 8,
-    timelinePanel.getBoundingClientRect().top - mapBox.top - 8,
-    mapKey.getBoundingClientRect().top - mapBox.top - 7,
-    lowPanel ? scene.top - mapBox.top - 7 : height,
-  );
+  const padding = clamp(width * .029, 10, 38);
+  const dock = layoutBox(timelinePanel);
+  const scene = layoutBox(storyPanel);
+  const opening = layoutBox(intro);
+  const sidebar = box => box && box.width < width * .57 && box.left - mapBox.left > width * .4;
+  const top = Math.max(
+    layoutBox(masthead)?.bottom ?? 0,
+    layoutBox(phaseControls)?.bottom ?? 0,
+  ) - mapBox.top + 9;
+  let left = padding;
+  let right = width - padding;
+  let bottom = height - 8;
+  if (opening) left = Math.min(width * .5, opening.right - mapBox.left + padding * .7);
+  for (const box of [scene, dock]) {
+    if (sidebar(box)) right = Math.min(right, box.left - mapBox.left - padding * .56);
+    else if (box) bottom = Math.min(bottom, box.top - mapBox.top - 8);
+  }
+  for (const box of [layoutBox(mapKey), layoutBox(mapModes), layoutBox(mapTools)]) {
+    if (box && box.right - mapBox.left > left && box.left - mapBox.left < right) {
+      bottom = Math.min(bottom, box.top - mapBox.top - 8);
+    }
+  }
   const usableHeight = Math.max(54, bottom - top);
-  const right = landscapePanel ? scene.left - mapBox.left - padding * .55 : width - padding;
-  const usableWidth = Math.max(54, right - padding);
+  const usableWidth = Math.max(54, right - left);
   const baseline = Math.min(usableWidth / .325, usableHeight / .215);
   return {
     width,
     height,
-    x: padding + usableWidth / 2,
+    x: left + usableWidth / 2,
     y: top + usableHeight / 2,
     baseline,
-    world: Math.min(usableWidth * .47, usableHeight * .476) / baseline,
+    world: Math.min(usableWidth * .48, usableHeight * .485) / baseline,
   };
+}
+
+function cameraFrame() {
+  return frameBounds ??= measureCameraFrame();
 }
 
 function getView() {
   const frame = cameraFrame();
-  return { ...frame, ...camera, radius: frame.baseline * camera.scale };
+  const view = { ...frame, ...camera, radius: frame.baseline * camera.scale };
+  view.locate = createProjector(view);
+  return view;
 }
 
 function globeScale() {
@@ -521,10 +588,22 @@ function draw() {
   drawFrame = undefined;
   const view = getView();
   if (!view.width || !view.height) return;
-  map.setAttribute('viewBox', `0 0 ${view.width} ${view.height}`);
+  const projection = [view.width, view.height, view.x, view.y, view.lon, view.lat, view.radius, view.scale].join(',');
+  const surfaceKey = `${projection}|${layers.terrain}|${window.devicePixelRatio}`;
+  if (lastSurfaceView !== surfaceKey) {
+    lastSurfaceView = surfaceKey;
+    surface.draw({ ...view, terrain: layers.terrain });
+  }
   viewAtLastDraw = view;
-  surface.draw({ ...view, terrain: layers.terrain });
-  drawHistoricalLayer(view, layers, layers.route ? project(stops[selectedIndex].coords, view) : null);
+  const overlayKey = `${projection}|${selectedIndex}|${Object.values(layers).join(',')}`;
+  if (lastProjectedView === overlayKey) {
+    drawTrail(view);
+    return;
+  }
+  lastProjectedView = overlayKey;
+  const viewBox = `0 0 ${view.width} ${view.height}`;
+  if (map.getAttribute('viewBox') !== viewBox) map.setAttribute('viewBox', viewBox);
+  drawHistoricalLayer(view, layers, layers.route ? view.locate(stops[selectedIndex].coords) : null);
   routeLayer.style.display = layers.route ? '' : 'none';
   markerLayer.style.display = layers.route ? '' : 'none';
   namesLayer.style.display = layers.route && layers.places ? '' : 'none';
@@ -535,7 +614,7 @@ function draw() {
     node.setAttribute('d', view.scale > .48 ? lines.map(line => linePath(line, view)).join('') : '');
   }
   for (const { node, coords } of mapLabelNodes) {
-    const { x, y, visible } = project(coords, view);
+    const { x, y, visible } = view.locate(coords);
     node.setAttribute('visibility', visible && layers.places && view.scale > .56 ? 'visible' : 'hidden');
     node.setAttribute('x', x);
     node.setAttribute('y', y);
@@ -546,7 +625,7 @@ function draw() {
     line.setAttribute('d', d);
   }
   stops.forEach((stop, i) => {
-    const { x, y, visible } = project(stop.coords, view);
+    const { x, y, visible } = view.locate(stop.coords);
     const inFrame = visible && x > 5 && x < view.width - 5 && y > 5 && y < view.height - 5;
     const showMarker = inFrame && (view.scale > .39 || i === selectedIndex);
     const marker = markerNodes[i];
@@ -608,7 +687,16 @@ function syncMode() {
   viewGlobe.setAttribute('aria-pressed', String(mode === 'globe'));
 }
 
+function dismissIntro() {
+  if (intro.hidden) return;
+  intro.hidden = true;
+  atlasWindow.classList.remove('journey-opening');
+  frameBounds = undefined;
+  queueDraw();
+}
+
 function setMode(nextMode) {
+  if (nextMode === 'route') dismissIntro();
   awaitingIntro = false;
   mode = nextMode;
   syncMode();
@@ -702,6 +790,7 @@ function selectFromHash() {
   const index = indexById.get(location.hash.slice('#stop='.length));
   if (index === undefined) return false;
   setPlaying(false);
+  if (!intro.hidden) setMode('route');
   selectStop(index, { updateHash: false });
   playback.reset(beatDuration(index));
   syncPlayButton(false);
@@ -715,6 +804,9 @@ setupRoute();
 setupMarkers();
 setupPhases();
 const timeline = makeTimeline(find('#stop-timeline'), stops, phases, chooseStop);
+const stations = find('.route-timeline__viewport');
+stations.id = 'journey-stations';
+readerTitle.tabIndex = -1;
 const playback = createPlayback({
   onAdvance() {
     if (selectedIndex === stops.length - 1) return false;
@@ -731,6 +823,7 @@ const playback = createPlayback({
   onStateChange: syncPlayButton,
 });
 if (location.hash.startsWith('#stop=') && indexById.has(location.hash.slice(6))) {
+  dismissIntro();
   awaitingIntro = false;
   mode = 'route';
   Object.assign(camera, routeCenter, { scale: 1 });
@@ -740,15 +833,53 @@ if (!selectFromHash()) selectStop(0, { updateHash: false, announce: false, move:
 if (mode === 'globe') camera.scale = globeScale();
 
 function resizeMap() {
+  frameBounds = undefined;
   if (mode === 'globe' && !animation) camera.scale = globeScale();
   queueDraw();
 }
 
 const observer = new ResizeObserver(resizeMap);
-for (const node of [mapFrame, phaseControls, timelinePanel, storyPanel]) observer.observe(node);
+for (const node of [mapFrame, masthead, phaseControls, timelinePanel, storyPanel, mapModes, mapTools]) observer.observe(node);
 surface.ready?.then(queueDraw);
 queueDraw();
 
+function setStationsExpanded(expanded) {
+  if (!expanded) {
+    closePlaybackSettings();
+    if (stations.contains(document.activeElement)) stationsToggle.focus({ preventScroll: true });
+  }
+  timelinePanel.dataset.stationsExpanded = String(expanded);
+  stationsToggle.setAttribute('aria-expanded', String(expanded));
+  stationsToggle.setAttribute('aria-label', expanded ? 'Hide all stops' : 'Show all stops');
+  stationsToggle.title = expanded ? 'Hide all stops' : 'Show all stops';
+  if (expanded) timeline.reveal();
+  resizeMap();
+}
+stationsToggle.addEventListener('click', () => setStationsExpanded(stationsToggle.getAttribute('aria-expanded') !== 'true'));
+timelinePanel.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && timelinePanel.dataset.stationsExpanded === 'true') {
+    setStationsExpanded(false);
+    stationsToggle.focus({ preventScroll: true });
+  }
+});
+phoneScene.addEventListener('click', () => openScene(phoneScene));
+readerPrevious.addEventListener('click', () => stepReader(-1));
+readerNext.addEventListener('click', () => stepReader(1));
+imageViewer.addEventListener('close', () => {
+  const fallback = phoneScene.getClientRects().length ? phoneScene : find('.scene-action');
+  const returnTo = readerReturnFocus?.isConnected && readerReturnFocus.getClientRects().length
+    ? readerReturnFocus : fallback;
+  (returnTo?.getClientRects().length ? returnTo : mapFrame).focus({ preventScroll: true });
+});
+find('#begin-journey').addEventListener('click', () => {
+  chooseStop(0);
+  find('.scene-action').focus({ preventScroll: true });
+});
+find('#explore-globe').addEventListener('click', () => {
+  dismissIntro();
+  showPreset('globe');
+  mapFrame.focus({ preventScroll: true });
+});
 previousButton.addEventListener('click', () => chooseStop(selectedIndex - 1));
 nextButton.addEventListener('click', () => chooseStop(selectedIndex + 1));
 playButton.addEventListener('click', () => setPlaying(!playback.isPlaying()));
@@ -771,7 +902,7 @@ viewGlobe.addEventListener('click', () => showPreset('globe'));
 sceneToggle.addEventListener('click', () => {
   storyPanel.hidden = !storyPanel.hidden;
   sceneToggle.setAttribute('aria-expanded', String(!storyPanel.hidden));
-  find('.atlas-window').classList.toggle('scene-hidden', storyPanel.hidden);
+  atlasWindow.classList.toggle('scene-hidden', storyPanel.hidden);
   resizeMap();
 });
 mapFrame.addEventListener('pointerdown', startPointer);
@@ -843,11 +974,12 @@ function connectPopover(trigger, panel) {
   document.addEventListener('pointerdown', event => {
     if (!panel.contains(event.target) && !trigger.contains(event.target)) dismiss();
   });
+  return dismiss;
 }
 
 const layerMenu = find('#layers-panel');
 connectPopover(find('#layers-toggle'), layerMenu);
-connectPopover(find('#playback-settings-toggle'), find('#playback-settings'));
+const closePlaybackSettings = connectPopover(find('#playback-settings-toggle'), find('#playback-settings'));
 layerMenu.addEventListener('change', event => {
   if (!(event.target instanceof HTMLInputElement)) return;
   const { layer } = event.target.dataset;

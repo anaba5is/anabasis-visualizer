@@ -1,5 +1,5 @@
 import { politicalRegions, administrations } from './historical-data.mjs';
-import { project } from './globe.mjs?v=2';
+import { createProjector } from './globe.mjs?v=4';
 
 const NS = 'http://www.w3.org/2000/svg';
 const SCREEN_MARGIN = 8;
@@ -41,7 +41,7 @@ function horizonIntersection(a, b, view) {
   let point;
   for (let step = 0; step < 12; step++) {
     const t = (start + end) / 2;
-    point = project(a.coords.map((value, i) => value + (b.coords[i] - value) * t), view);
+    point = view.locate(a.coords.map((value, i) => value + (b.coords[i] - value) * t));
     if (point.visible === a.point.visible) start = t;
     else end = t;
   }
@@ -58,7 +58,7 @@ function closeAroundGlobe(start, end, view) {
 }
 
 function ringPaths(ring, view) {
-  const points = ring.slice(0, -1).map(coords => ({ coords, point: project(coords, view) }));
+  const points = ring.slice(0, -1).map(coords => ({ coords, point: view.locate(coords) }));
   const firstHidden = points.findIndex(({ point }) => !point.visible);
   if (firstHidden === -1) {
     const closed = pathThrough(points.map(({ point }) => point)) + 'Z';
@@ -191,6 +191,7 @@ export function addHistoricalLayer(map) {
   for (const feature of [...shapes, ...anchors]) feature.width = textWidth(feature.label);
 
   return function drawHistoricalLayer(view, layers, routePoint) {
+    if (!view.locate) view = { ...view, locate: createProjector(view) };
     const bordersVisible = layers.borders;
     const namesVisible = bordersVisible && view.scale > .58;
     const seatsVisible = layers.administration && view.scale > .33;
@@ -210,7 +211,7 @@ export function addHistoricalLayer(map) {
         shape.fill.setAttribute('opacity', view.scale < .35 ? '.17' : '.11');
         shape.outline.setAttribute('d', paths.map(path => path.outline).join(''));
         if (namesVisible) {
-          const point = project(shape.coords, view);
+          const point = view.locate(shape.coords);
           const candidate = onScreen(point, view) && centeredLabel(point, shape.width, view);
           const label = labelFits(candidate, view, occupied) ? candidate : null;
           showLabel(shape.label, label);
@@ -222,7 +223,7 @@ export function addHistoricalLayer(map) {
     for (const { group, label, coords, width, isNeighbor, hasMarker, duplicate } of anchors) {
       let placement = null;
       if (isNeighbor ? neighborsVisible : seatsVisible) {
-        const point = project(coords, view);
+        const point = view.locate(coords);
         const shown = onScreen(point, view);
         group.setAttribute('display', shown ? 'inline' : 'none');
         if (shown) {

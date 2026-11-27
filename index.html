@@ -8,11 +8,14 @@
   <title>Anabasis Visualizer</title>
   <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
   <link rel="preload" href="./assets/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./assets/globe-relief.webp" as="image" fetchpriority="high">
   <link rel="stylesheet" href="./styles.css?v=3">
-  <link rel="stylesheet" href="./timeline.css?v=3">
+  <link rel="stylesheet" href="./timeline.css?v=4">
   <link rel="stylesheet" href="./fullscreen.css?v=2">
   <link rel="stylesheet" href="./glass.css?v=3">
-  <script type="module" src="./atlas.mjs?v=3"></script>
+  <link rel="stylesheet" href="./experience.css">
+  <link rel="stylesheet" href="./mobile.css">
+  <script type="module" src="./atlas.mjs?v=4"></script>
 </head>
 <body>
   <a class="skip-link" href="#timeline">Skip to the timeline</a>
@@ -30,7 +33,7 @@
   <main id="atlas" class="frame">
     <section class="atlas-section" aria-label="The route of the Ten Thousand, 401 to 399 BCE">
       <div class="route-controls" id="phase-controls" role="group" aria-label="Route phases"></div>
-      <div class="atlas-window">
+      <div class="atlas-window journey-opening">
         <div class="map-panel">
           <div class="map-frame" tabindex="0" role="region" aria-label="Rotatable globe" aria-describedby="globe-instructions">
             <canvas id="globe-canvas" aria-hidden="true"></canvas>
@@ -56,6 +59,15 @@
             <span class="globe-tip" id="globe-instructions">Drag to rotate<span class="sr-only">, or use arrow keys when focused</span></span>
           </div>
         </div>
+        <section class="journey-intro" id="journey-intro" aria-labelledby="intro-title">
+          <p class="intro-period">Xenophon’s <em>Anabasis</em> <span aria-hidden="true">·</span> 401–399 BCE</p>
+          <h2 id="intro-title">The March of<br>the Ten Thousand</h2>
+          <p class="intro-lead">A Persian prince hired Greek mercenaries to march east. When he fell, they had to find their own way out.</p>
+          <div class="intro-actions">
+            <button type="button" id="begin-journey">Begin the journey</button>
+            <button type="button" id="explore-globe">Explore the globe</button>
+          </div>
+        </section>
         <aside class="glass-popover layer-menu" id="layers-panel" aria-labelledby="layers-heading" hidden>
           <h2 id="layers-heading">Map layers</h2>
           <label><input type="checkbox" data-layer="route" checked> Expedition</label>
@@ -66,9 +78,18 @@
           <label><input type="checkbox" data-layer="places" checked> Place names</label>
           <label><input type="checkbox" data-layer="grid" checked> Latitude and longitude</label>
           <p>Territories around 401 BCE are approximate. Administrative markers indicate locations.</p>
+          <div class="compact-map" aria-label="Route symbols">
+            <span><i class="key-stop" aria-hidden="true"></i> Identified stop</span>
+            <span><i class="key-estimate" aria-hidden="true"></i> Approximate or disputed</span>
+            <span><i class="key-dashed" aria-hidden="true"></i> Uncertain route leg</span>
+          </div>
         </aside>
-        <section class="timeline-panel" id="timeline" tabindex="-1" aria-labelledby="timeline-heading">
-          <div class="timeline-header">
+        <section class="timeline-panel" id="timeline" tabindex="-1" aria-labelledby="timeline-heading" data-stations-expanded="false">
+          <div class="timeline-header phone-journey">
+            <button class="phone-scene" id="phone-scene" type="button">
+              <span class="phone-thumb"><img id="phone-thumb-image" alt="" width="40" height="40" loading="lazy" decoding="async"></span>
+              <span class="phone-scene-title"><span class="phone-stage"></span><span class="phone-place"></span></span>
+            </button>
             <div class="timeline-title">
               <h2 id="timeline-heading">Timeline</h2>
               <span id="stop-counter" aria-hidden="true"></span>
@@ -76,9 +97,10 @@
             </div>
             <div class="story-nav" role="group" aria-label="Step through the timeline">
               <button type="button" id="play-route" aria-label="Play journey"><span aria-hidden="true">▶</span> <span id="play-label">Play</span></button>
-              <button type="button" id="previous-stop" aria-label="Previous stop">Prev<span class="wide-button-text">ious</span></button>
-              <button type="button" id="next-stop" aria-label="Next stop">Next<span class="wide-button-text"> stop</span></button>
+              <button type="button" id="previous-stop" aria-label="Previous stop"><span class="phone-control-icon" aria-hidden="true">‹</span><span class="step-label">Previous</span></button>
+              <button type="button" id="next-stop" aria-label="Next stop"><span class="phone-control-icon" aria-hidden="true">›</span><span class="step-label">Next stop</span></button>
               <button type="button" id="playback-settings-toggle" class="icon-button" aria-controls="playback-settings" aria-expanded="false" aria-label="Playback settings" title="Playback settings">···</button>
+              <button type="button" id="stations-toggle" aria-controls="journey-stations" aria-expanded="false" aria-label="Show all stops" title="Show all stops"><span class="stations-glyph" aria-hidden="true"></span><span class="stations-label">Stops</span></button>
             </div>
           </div>
           <div id="stop-timeline"></div>
@@ -142,7 +164,13 @@
         <p class="stop-region" id="scene-viewer-region"></p>
         <h2 id="image-viewer-title"></h2>
       </div>
-      <form method="dialog"><button type="submit" aria-label="Close scene" autofocus>Done</button></form>
+      <div class="scene-reader-actions">
+        <nav aria-label="Read adjacent scenes">
+          <button type="button" id="reader-previous" aria-label="Previous scene">‹</button>
+          <button type="button" id="reader-next" aria-label="Next scene">›</button>
+        </nav>
+        <form method="dialog"><button type="submit" aria-label="Close scene" autofocus>Done</button></form>
+      </div>
     </header>
     <figure>
       <img alt="">

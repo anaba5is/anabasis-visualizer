@@ -155,5 +155,5 @@ export function makeTimeline(container, stops, phases, onSelect) {
   });
 
   select(0, { reveal: false });
-  return { select, setProgress };
+  return { select, setProgress, reveal: () => revealStop(selectedIndex) };
 }

@@ -10,23 +10,52 @@ const DETAIL_MIN_RADIUS = 450;
 const DETAIL_FULL_RADIUS = 1000;
 const DETAIL_BLEND_DEGREES = 1.6;
 
-export function project([longitude, latitude], camera) {
+function projectPoint([longitude, latitude], lon, sinCenter, cosCenter, x, y, radius) {
   const lat = latitude * RADIANS;
-  const lonDelta = (longitude - camera.lon) * RADIANS;
-  const centerLat = camera.lat * RADIANS;
+  const lonDelta = (longitude - lon) * RADIANS;
   const sinLat = Math.sin(lat);
   const cosLat = Math.cos(lat);
-  const sinCenter = Math.sin(centerLat);
-  const cosCenter = Math.cos(centerLat);
   const meridian = cosLat * Math.cos(lonDelta);
   const depth = sinCenter * sinLat + cosCenter * meridian;
 
   return {
-    x: camera.x + camera.radius * cosLat * Math.sin(lonDelta),
-    y: camera.y - camera.radius * (cosCenter * sinLat - sinCenter * meridian),
+    x: x + radius * cosLat * Math.sin(lonDelta),
+    y: y - radius * (cosCenter * sinLat - sinCenter * meridian),
     visible: depth > 0,
     depth,
   };
+}
+
+export function project(point, { lon, lat, x, y, radius }) {
+  const center = lat * RADIANS;
+  return projectPoint(point, lon, Math.sin(center), Math.cos(center), x, y, radius);
+}
+
+export function createProjector({ lon, lat, x, y, radius }) {
+  const center = lat * RADIANS;
+  const sinCenter = Math.sin(center);
+  const cosCenter = Math.cos(center);
+  return point => projectPoint(point, lon, sinCenter, cosCenter, x, y, radius);
+}
+
+const [WEST, SOUTH, EAST, NORTH] = REGIONAL_BOUNDS;
+const regionCenter = { lon: (WEST + EAST) / 2, lat: (SOUTH + NORTH) / 2 };
+const regionProject = createProjector({ ...regionCenter, x: 0, y: 0, radius: 1 });
+const regionAngularRadius = Math.max(...[
+  [WEST, SOUTH], [WEST, NORTH], [EAST, SOUTH], [EAST, NORTH],
+].map(point => Math.acos(regionProject(point).depth)));
+
+function needsRegionalTexture(camera) {
+  // Fetch ahead of the detail transition while zooming. A globe fully inside
+  // the viewport and a close view on the other side of Earth use the base map.
+  const scale = Math.min(globalThis.devicePixelRatio || 1, 2);
+  if (camera.radius * scale < DETAIL_MIN_RADIUS * .72
+      || camera.radius <= Math.min(camera.width, camera.height) * .55) return false;
+  const maxOffsetX = Math.max(Math.abs(camera.x), Math.abs(camera.width - camera.x));
+  const maxOffsetY = Math.max(Math.abs(camera.y), Math.abs(camera.height - camera.y));
+  const viewingAngle = Math.asin(Math.min(1, Math.hypot(maxOffsetX, maxOffsetY) / camera.radius));
+  const cropCenter = project([regionCenter.lon, regionCenter.lat], camera);
+  return cropCenter.depth >= Math.cos(viewingAngle + regionAngularRadius);
 }
 
 function basis({ lon, lat }) {
@@ -134,14 +163,33 @@ function compileShader(gl, type, source) {
   return null;
 }
 
-function createWebGLRenderer(canvas, output, onContextLost) {
-  const layer = document.createElement('canvas');
-  const gl = layer.getContext('webgl', {
+function drawGlobePixels(gl, width, height, x, y, radiusX, radiusY) {
+  const halo = 1 + Math.min(.085, 36.4 / Math.min(radiusX, radiusY));
+  const left = Math.max(0, Math.floor(x - radiusX * halo));
+  const right = Math.min(width, Math.ceil(x + radiusX * halo));
+  const bottom = Math.max(0, Math.floor(height - y - radiusY * halo));
+  const top = Math.min(height, Math.ceil(height - y + radiusY * halo));
+  if (left === 0 && right === width && bottom === 0 && top === height) {
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    return;
+  }
+
+  // At globe scale the rest of the viewport is entirely transparent. Skip it
+  // rather than running the relief shader and writing all four channels there.
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  if (right <= left || top <= bottom) return;
+  gl.enable(gl.SCISSOR_TEST);
+  gl.scissor(left, bottom, right - left, top - bottom);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.disable(gl.SCISSOR_TEST);
+}
+
+function createWebGLRenderer(canvas) {
+  const gl = canvas.getContext('webgl', {
     alpha: true,
     antialias: false,
     depth: false,
     premultipliedAlpha: false,
-    preserveDrawingBuffer: true,
   });
   if (!gl) return null;
 
@@ -197,11 +245,6 @@ function createWebGLRenderer(canvas, output, onContextLost) {
   gl.activeTexture(gl.TEXTURE0);
   const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
 
-  layer.addEventListener('webglcontextlost', event => {
-    event.preventDefault();
-    onContextLost();
-  });
-
   return {
     setImage(image) {
       if (gl.isContextLost()) return;
@@ -224,26 +267,24 @@ function createWebGLRenderer(canvas, output, onContextLost) {
       const scale = Math.min(globalThis.devicePixelRatio || 1, 2);
       const width = Math.max(1, Math.round(camera.width * scale));
       const height = Math.max(1, Math.round(camera.height * scale));
-      if (layer.width !== width || layer.height !== height) {
-        layer.width = width;
-        layer.height = height;
-      }
       resize(canvas, width, height);
 
       const xScale = width / camera.width;
       const yScale = height / camera.height;
+      const x = camera.x * xScale;
+      const y = camera.y * yScale;
+      const radiusX = camera.radius * xScale;
+      const radiusY = camera.radius * yScale;
       const { east, north, center } = basis(camera);
       gl.viewport(0, 0, width, height);
       gl.uniform1f(uniforms.height, height);
-      gl.uniform2f(uniforms.origin, camera.x * xScale, camera.y * yScale);
-      gl.uniform2f(uniforms.radius, camera.radius * xScale, camera.radius * yScale);
+      gl.uniform2f(uniforms.origin, x, y);
+      gl.uniform2f(uniforms.radius, radiusX, radiusY);
       gl.uniform3fv(uniforms.east, east);
       gl.uniform3fv(uniforms.north, north);
       gl.uniform3fv(uniforms.center, center);
       gl.uniform1i(uniforms.terrainEnabled, camera.terrain !== false ? 1 : 0);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      output.clearRect(0, 0, width, height);
-      output.drawImage(layer, 0, 0);
+      drawGlobePixels(gl, width, height, x, y, radiusX, radiusY);
       return true;
     },
   };
@@ -340,6 +381,7 @@ function createSoftwareRenderer(canvas, output) {
       const yScale = height / camera.height;
       const pixelRadius = Math.min(xScale, yScale) * camera.radius;
       const halo = Math.min(0.085, 36 / pixelRadius);
+      const haloDistance = (1 + halo) ** 2;
       const limbWidth = 1.3 / pixelRadius;
       const detailZoom = regionalTerrain
         ? smoothstep((pixelRadius - DETAIL_MIN_RADIUS) / (DETAIL_FULL_RADIUS - DETAIL_MIN_RADIUS)) : 0;
@@ -350,15 +392,21 @@ function createSoftwareRenderer(canvas, output) {
 
       for (let row = 0; row < height; row++) {
         const y = (camera.y - (row + 0.5) / yScale) / camera.radius;
-        for (let column = 0; column < width; column++) {
+        const ySquared = y * y;
+        if (ySquared > haloDistance) continue;
+        const span = Math.sqrt(haloDistance - ySquared) * camera.radius;
+        const left = Math.max(0, Math.ceil((camera.x - span) * xScale - .5));
+        const right = Math.min(width - 1, Math.floor((camera.x + span) * xScale - .5));
+        for (let column = left; column <= right; column++) {
           const x = ((column + 0.5) / xScale - camera.x) / camera.radius;
-          const distance = x * x + y * y;
+          const distance = x * x + ySquared;
           const i = (row * width + column) * 4;
           if (distance > 1) {
-            if (distance <= (1 + halo) ** 2) {
-              const intensity = Math.exp(-4.8 * (Math.sqrt(distance) - 1) / halo);
-              pixels.set([69, 122, 117, 74 * intensity], i);
-            }
+            const intensity = Math.exp(-4.8 * (Math.sqrt(distance) - 1) / halo);
+            pixels[i] = 69;
+            pixels[i + 1] = 122;
+            pixels[i + 2] = 117;
+            pixels[i + 3] = 74 * intensity;
             continue;
           }
 
@@ -410,27 +458,78 @@ function createSoftwareRenderer(canvas, output) {
 }
 
 export function createGlobe(canvas) {
-  const output = canvas.getContext('2d');
   let latest;
   let terrain;
   let regionalTerrain;
-  let hardware = createWebGLRenderer(canvas, output, () => {
-    hardware = null;
-    if (latest) draw(latest);
-  });
+  let regionalRequested = false;
+  let hardware = createWebGLRenderer(canvas);
   let software;
+  let fallback;
+  const originalVisibility = canvas.style.visibility;
+
+  function softwareRenderer() {
+    if (software) return software;
+    // A canvas that was bound to WebGL cannot be reused for Canvas 2D.
+    // If WebGL was unavailable from the start, reuse the original element.
+    let target = canvas;
+    let output = canvas.getContext('2d');
+    if (!output) {
+      fallback = document.createElement('canvas');
+      fallback.className = 'globe-fallback';
+      fallback.setAttribute('aria-hidden', 'true');
+      Object.assign(fallback.style, {
+        position: 'absolute', inset: '0', width: '100%', height: '100%', pointerEvents: 'none',
+      });
+      target = fallback;
+      output = fallback.getContext('2d');
+      if (!output) return null;
+      canvas.after(fallback);
+      canvas.style.visibility = 'hidden';
+    }
+    software = createSoftwareRenderer(target, output);
+    if (terrain) software.setImage(terrain);
+    if (regionalTerrain) software.setRegionalImage(regionalTerrain);
+    return software;
+  }
+
+  function requestRegionalTexture() {
+    regionalRequested = true;
+    const image = new Image();
+    image.fetchPriority = 'low';
+    image.decoding = 'async';
+    image.onload = () => {
+      regionalTerrain = image;
+      hardware?.setRegionalImage(image);
+      software?.setRegionalImage(image);
+      if (latest) draw(latest);
+    };
+    image.src = REGIONAL_TEXTURE_URL;
+  }
 
   function draw(camera) {
     if (!(camera.radius > 0 && camera.width > 0 && camera.height > 0)) return;
     latest = { ...camera };
-    if (hardware?.draw(camera)) return;
-    if (!software) {
-      software = createSoftwareRenderer(canvas, output);
-      if (terrain) software.setImage(terrain);
-      if (regionalTerrain) software.setRegionalImage(regionalTerrain);
-    }
-    software.draw(camera);
+    if (!regionalRequested && needsRegionalTexture(camera)) requestRegionalTexture();
+    if (!hardware?.draw(camera)) softwareRenderer()?.draw(camera);
   }
+
+  canvas.addEventListener('webglcontextlost', event => {
+    event.preventDefault();
+    hardware = null;
+    if (latest) draw(latest);
+  });
+
+  canvas.addEventListener('webglcontextrestored', () => {
+    hardware = createWebGLRenderer(canvas);
+    if (!hardware) return;
+    if (terrain) hardware.setImage(terrain);
+    if (regionalTerrain) hardware.setRegionalImage(regionalTerrain);
+    if (latest && !hardware.draw(latest)) return;
+    fallback?.remove();
+    fallback = undefined;
+    software = undefined;
+    canvas.style.visibility = originalVisibility;
+  });
 
   const ready = new Promise(resolve => {
     const image = new Image();
@@ -445,17 +544,6 @@ export function createGlobe(canvas) {
     image.onerror = () => resolve(false);
     image.src = TEXTURE_URL;
   });
-
-  const regionalImage = new Image();
-  regionalImage.fetchPriority = 'low';
-  regionalImage.decoding = 'async';
-  regionalImage.onload = () => {
-    regionalTerrain = regionalImage;
-    hardware?.setRegionalImage(regionalImage);
-    software?.setRegionalImage(regionalImage);
-    if (latest) draw(latest);
-  };
-  regionalImage.src = REGIONAL_TEXTURE_URL;
 
   return { draw, project, ready };
 }

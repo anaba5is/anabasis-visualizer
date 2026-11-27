@@ -6,11 +6,11 @@ A full-viewport globe and illustrated timeline of Xenophon’s *Anabasis*. Fifte
 
 ## Explore the expedition
 
-- The site opens on the whole Earth. **Route** zooms to the expedition. Drag or use the arrow keys to rotate, use the wheel or zoom buttons to move in and out, or pinch on a touch screen. **Scene** toggles the illustrated panel. The fullscreen control expands the globe beyond the browser chrome where supported.
+- The site opens on the whole Earth. **Begin the journey** on desktop and **Route** on any screen zoom to the expedition. Drag or use the arrow keys to rotate, use the wheel or zoom buttons to move in and out, or pinch on a touch screen. **Scene** toggles the desktop field notes. Phones keep the current scene and scrubber in one compact dock. Open **Stops** for the book rail and playback settings. The fullscreen control expands the globe beyond the browser chrome where supported.
 - Select a route phase, map pin, book-band stop, or the journey scrubber to see the corresponding scene. Use **Previous**, **Next stop**, or **Play** to travel in order. Playback traces each incoming leg, and its settings offer speed and camera-follow controls. Each selected stop has a shareable URL.
 - Open **Layers** to toggle the expedition, terrain relief, approximate political outlines, satrapies and seats, nearby peoples and cities, place names, or the geographic grid.
 - With the map focused, use the arrow keys to rotate the globe. With a timeline stop focused, use the left and right arrows to step between stops, or Home and End to jump to the first or last scene.
-- Open **Details** on the scene card for the full image and story. **Passages & image credit** lists Xenophon’s passages, location certainty, and the illustration’s source.
+- Open a scene from the desktop card or phone dock for the full image and story. Use the previous and next scene buttons in the reader to move through the account. **Passages & image credit** lists Xenophon’s passages, location certainty, and the illustration’s source.
 
 ## Run locally
 
@@ -36,6 +36,10 @@ The research notes document earlier Anabasis map projects, editions of the prima
 
 The high-detail terrain and shoreline use Natural Earth 1:10m data within 20°–52°E and 25°–47°N. The globe uses the coarser 1:50m layer elsewhere. [Historical borders and administrative sources](historical-sources.md) · [Natural Earth shaded relief](https://www.naturalearthdata.com/downloads/10m-raster-data/10m-shaded-relief/)
 
-To regenerate the regional map geometry and shaded relief, install [uv](https://docs.astral.sh/uv/) and run `uv run scripts/build-map.py`. The script downloads the public-domain Natural Earth inputs and writes `assets/map-geometry.mjs` and `assets/anabasis-relief.webp`. [Natural Earth terms of use](https://www.naturalearthdata.com/about/terms-of-use/)
+To regenerate the regional rivers, install [uv](https://docs.astral.sh/uv/) and run `uv run scripts/build-map.py`. The script downloads the public-domain Natural Earth river vectors and writes `assets/map-geometry.mjs`. [Natural Earth terms of use](https://www.naturalearthdata.com/about/terms-of-use/)
 
 Run `uv run scripts/build-globe-detail.py` to generate the higher-resolution regional texture using Natural Earth 1:10m terrain and coastline data.
+
+Run `node scripts/build-scene-previews.mjs` with the WebP tools `cwebp` and `dwebp` available to regenerate the phone thumbnails and desktop card previews from the full scene images.
+
+[Design, code, performance, and narrative review](audit.md)
