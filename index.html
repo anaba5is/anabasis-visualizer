@@ -12,19 +12,21 @@
   <link rel="preload" href="./assets/globe-relief.webp" as="image" fetchpriority="high" media="(min-width: 52.001rem)">
   <link rel="stylesheet" href="./styles.css?v=d433a2b">
   <link rel="stylesheet" href="./timeline.css?v=d433a2b">
-  <link rel="stylesheet" href="./layout.css?v=d433a2b">
+  <link rel="stylesheet" href="./layout.css?v=compact-reader">
   <link rel="stylesheet" href="./historical-map.css">
   <link rel="stylesheet" href="./typography.css">
-  <script type="module" src="./atlas.mjs"></script>
+  <script type="module" src="./atlas.mjs?v=compact-reader"></script>
 </head>
 <body>
   <a class="skip-link" href="#timeline">Skip to the timeline</a>
   <header class="masthead frame">
-    <a class="wordmark" href="./" aria-label="Anabasis Visualizer home">
-      <img src="./assets/mark.svg" alt="" width="42" height="42">
-      <h1>Anabasis Visualizer</h1>
-    </a>
-    <p class="header-period">Xenophon’s expedition <span aria-hidden="true">·</span> 401–399 BCE</p>
+    <div class="masthead-identity">
+      <a class="wordmark" href="./" aria-label="Anabasis Visualizer home">
+        <img src="./assets/mark.svg" alt="" width="42" height="42">
+        <h1>Anabasis Visualizer</h1>
+      </a>
+      <p class="header-period"><span class="header-period-intro">Xenophon’s expedition · </span>401–399 BCE</p>
+    </div>
     <nav class="site-nav" aria-label="Site">
       <a href="#sources" aria-controls="sources" aria-expanded="false">Sources</a>
     </nav>
@@ -117,8 +119,8 @@
             </div>
             <div class="story-nav" role="group" aria-label="Step through the timeline">
               <button type="button" id="play-route" aria-label="Play journey"><span aria-hidden="true">▶</span> <span id="play-label">Play</span></button>
-              <button type="button" id="previous-stop" aria-label="Previous stop"><span class="phone-control-icon" aria-hidden="true">‹</span><span class="step-label">Previous</span></button>
-              <button type="button" id="next-stop" aria-label="Next stop"><span class="phone-control-icon" aria-hidden="true">›</span><span class="step-label">Next stop</span></button>
+              <button type="button" class="timeline-step" id="previous-stop" aria-label="Previous stop" title="Previous stop">‹</button>
+              <button type="button" class="timeline-step" id="next-stop" aria-label="Next stop" title="Next stop">›</button>
               <button type="button" id="playback-settings-toggle" class="icon-button" aria-controls="playback-settings" aria-expanded="false" aria-label="Playback settings" title="Playback settings">···</button>
               <button type="button" id="stations-toggle" aria-controls="journey-stations" aria-expanded="false" aria-label="Show all stops" title="Show all stops"><span class="stations-glyph" aria-hidden="true"></span><span class="stations-label">Stops</span></button>
             </div>

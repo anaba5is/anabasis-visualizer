@@ -15,6 +15,15 @@ export function formatStopDate(stop) {
   return stop.date.startsWith('Winter ') ? stop.date : 'c. ' + stop.date;
 }
 
+function noteSummary(label, preview) {
+  const summary = html('summary', 'reader-note-summary');
+  const caret = html('span', 'reader-note-caret');
+  caret.setAttribute('aria-hidden', 'true');
+  summary.append(caret, html('span', '', label));
+  if (preview) summary.append(html('span', 'reader-note-preview', preview));
+  return summary;
+}
+
 function passageNotes(stop, scene) {
   const notes = html('details', 'stop-notes');
   const citation = html('p', 'text-citation', `Xenophon, Anabasis ${stop.book}`);
@@ -32,8 +41,7 @@ function passageNotes(stop, scene) {
   if (scene.objectSource) credit.append(' · ', link('Museum catalogue', scene.objectSource));
   if (stop.locationSource) links.append(link('Location study', stop.locationSource));
   notes.append(
-    html('summary', '', 'Passages & image credit'),
-    html('p', '', `Location ${stop.certainty.toLowerCase()}`),
+    noteSummary('Passages & image credit', `${stop.certainty} location`),
     citation,
     links,
     credit,
@@ -78,24 +86,25 @@ export function createSceneReader(dialog, { index, select, pause, fallbackFocus,
     } else {
       readerCaption.replaceChildren(caption);
     }
-    readerLead.replaceChildren(html('h3', '', stop.title), html('p', '', stop.summary));
-    const backstory = html('details', 'reader-backstory');
-    backstory.append(html('summary', '', 'Backstory'));
-    const content = html('div', 'reader-backstory-copy');
     const chapter = journeyChapters[stop.phase];
-    if (stop.id === 'sardis') {
-      content.append(contextNote(expeditionContext));
-    } else if (chapter && stops[i - 1]?.phase !== stop.phase) {
-      content.append(contextNote({
-        title: chapter.title,
-        text: chapter.synopsis,
-        source: chapter.source,
-        sourceLabel: `Read Xenophon ${chapter.book}`,
-      }));
-    }
-    content.append(html('p', '', stop.detail));
-    if (stop.whyItMatters) content.append(html('p', 'reader-takeaway', stop.whyItMatters));
+    const startsChapter = chapter && stops[i - 1]?.phase !== stop.phase;
+    const opening = stop.id === 'sardis' ? expeditionContext : startsChapter ? {
+      title: chapter.title,
+      text: chapter.synopsis,
+      source: chapter.source,
+      sourceLabel: `Read Xenophon ${chapter.book}`,
+    } : null;
     const context = sceneContext[stop.id];
+    const hasBackstory = opening || context || stop.whyItMatters;
+    const lead = hasBackstory && stop.detail.match(/^(.+?[.!?]) (.+)$/);
+    readerLead.replaceChildren(html('h3', '', stop.title), html('p', '', stop.summary));
+    if (lead) readerLead.append(html('p', '', lead[1]));
+    const backstory = html('details', 'reader-backstory');
+    backstory.append(noteSummary(hasBackstory ? 'Backstory' : 'More about this stop', (context ?? opening)?.title));
+    const content = html('div', 'reader-backstory-copy');
+    if (opening) content.append(contextNote(opening));
+    content.append(html('p', '', lead ? lead[2] : stop.detail));
+    if (stop.whyItMatters) content.append(html('p', 'reader-takeaway', stop.whyItMatters));
     if (context) content.append(contextNote(context));
     backstory.append(content);
     readerCopy.replaceChildren(backstory, passageNotes(stop, scene));

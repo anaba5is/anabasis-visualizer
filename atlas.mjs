@@ -13,7 +13,7 @@ import { connectPopover } from './popover.mjs';
 import { readAtlasLocation, writeAtlasLocation } from './atlas-location.mjs';
 import { connectWorldPanel } from './world-panel.mjs';
 import { html, link } from './dom.mjs';
-import { bookFor, placeAndBook, formatStopDate, createSceneReader } from './scene-reader.mjs';
+import { bookFor, placeAndBook, formatStopDate, createSceneReader } from './scene-reader.mjs?v=compact-reader';
 
 const phases = [
   { name: 'March inland', color: '#f1b66f', timelineColor: '#a4662a' },
