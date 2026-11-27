@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="Explore the route of Xenophon’s Anabasis in an illustrated, source-linked map and timeline.">
   <meta name="theme-color" content="#f5efe4">
   <title>Anabasis Visualizer</title>
@@ -10,6 +10,7 @@
   <link rel="preload" href="./assets/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./timeline.css">
+  <link rel="stylesheet" href="./fullscreen.css">
   <script type="module" src="./atlas.mjs"></script>
 </head>
 <body>
@@ -21,12 +22,12 @@
     </a>
     <p class="header-period">Xenophon’s expedition <span aria-hidden="true">·</span> 401–399 BCE</p>
     <nav class="site-nav" aria-label="Site">
-      <a href="#sources">Sources</a>
+      <a href="#sources" aria-controls="sources" aria-expanded="false">Sources</a>
     </nav>
   </header>
 
   <main id="atlas" class="frame">
-    <section class="atlas-section" aria-label="The route of the Ten Thousand">
+    <section class="atlas-section" aria-label="The route of the Ten Thousand, 401 to 399 BCE">
       <div class="route-controls" id="phase-controls" role="group" aria-label="Route phases"></div>
       <div class="atlas-window">
         <div class="map-panel">
@@ -36,11 +37,12 @@
             <div class="map-controls" role="group" aria-label="Map zoom">
               <button type="button" id="zoom-in" aria-label="Zoom in" title="Zoom in">+</button>
               <button type="button" id="zoom-out" aria-label="Zoom out" title="Zoom out">−</button>
-              <button type="button" id="zoom-reset" aria-label="Reset route view" title="Reset route view">⤢</button>
+              <button type="button" id="zoom-reset" aria-label="Reset route view" title="Reset route view">⌂</button>
+              <button type="button" id="fullscreen-toggle" aria-label="Enter fullscreen" title="Enter fullscreen" hidden>⛶</button>
             </div>
             <div class="map-mode" role="group" aria-label="Globe views">
-              <button type="button" id="view-route" aria-pressed="true">Route</button>
-              <button type="button" id="view-globe" aria-pressed="false">Globe</button>
+              <button type="button" id="view-route" aria-pressed="false">Route</button>
+              <button type="button" id="view-globe" aria-pressed="true">Globe</button>
               <button type="button" id="scene-toggle" aria-controls="story-panel" aria-expanded="true">Scene</button>
             </div>
             <span class="map-scale" id="map-scale" aria-hidden="true"></span>
@@ -76,6 +78,7 @@
 
     <details class="source-notes" id="sources">
       <summary>Sources &amp; map notes</summary>
+      <button type="button" class="atlas-dismiss" id="close-sources" aria-label="Close sources">×</button>
       <div class="notes-grid">
         <article>
           <h2>The seven books</h2>
@@ -96,14 +99,21 @@
           <div class="note-links">
             <a href="https://agesofeurope.eu/chapter-09-xenophon">Campaign Atlas</a>
             <a href="https://ciancolgan.com/ten/thousand.html">Tracking the Ten Thousand</a>
+            <a href="https://github.com/anaba5is/anabasis-visualizer">GitHub</a>
           </div>
         </article>
       </div>
     </details>
   </main>
-  <footer class="site-footer frame">
-    <span>Anabasis Visualizer</span>
-    <a href="https://github.com/anaba5is/anabasis-visualizer">GitHub</a>
-  </footer>
+  <dialog class="image-viewer" id="image-viewer" aria-labelledby="image-viewer-title">
+    <header>
+      <h2 id="image-viewer-title"></h2>
+      <form method="dialog"><button type="submit">Close image</button></form>
+    </header>
+    <figure>
+      <img alt="">
+      <figcaption></figcaption>
+    </figure>
+  </dialog>
 </body>
 </html>

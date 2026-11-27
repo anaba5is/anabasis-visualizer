@@ -1,12 +1,12 @@
 # Anabasis Visualizer
 
-An interactive, illustrated atlas of Xenophon’s *Anabasis*. Fifteen scenes follow all seven books, from Cyrus the Younger’s muster at Sardis to the handover of the surviving Greek mercenaries at Pergamum.
+A full-viewport globe and illustrated timeline of Xenophon’s *Anabasis*. Fifteen scenes follow all seven books, from Cyrus the Younger’s muster at Sardis to the handover of the surviving Greek mercenaries at Pergamum.
 
 [Open the GitHub Pages site](https://anaba5is.github.io/anabasis-visualizer/)
 
 ## Explore the expedition
 
-- **Route** fits the expedition on the map. **Globe** zooms out to a rotatable Earth. Drag to rotate, use `+` and `−` to zoom, or pinch on a touch screen.
+- The site opens on the whole Earth. **Route** zooms to the expedition. Drag or use the arrow keys to rotate, use the wheel or zoom buttons to move in and out, or pinch on a touch screen. **Scene** toggles the illustrated panel. The fullscreen control expands the globe beyond the browser chrome where supported.
 - Select a route phase, map pin, or timeline stop to see the corresponding scene. Use **Previous**, **Next stop**, or **Play** to follow the story in order. Each selected stop has a shareable URL.
 - With the map focused, use the arrow keys to rotate the globe. With a timeline stop focused, use the left and right arrows to step between stops, or Home and End to jump to the first or last scene.
 - Open **Passage & image credit** to find the relevant passage from Xenophon, the location’s level of certainty, and the illustration’s source.

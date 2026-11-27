@@ -42,11 +42,20 @@ const viewRoute = find('#view-route');
 const viewGlobe = find('#view-globe');
 const sources = find('#sources');
 const sceneToggle = find('#scene-toggle');
+const storyPanel = find('#story-panel');
+const timelinePanel = find('.timeline-panel');
+const phaseControls = find('#phase-controls');
+const mapKey = find('.map-key');
+const navSources = find('.site-nav a');
+const closeSources = find('#close-sources');
+const fullscreen = find('#fullscreen-toggle');
+const imageViewer = find('#image-viewer');
 const scaleBar = find('#map-scale');
 const queuedScenes = new Set();
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const routeCenter = { lon: 35.5, lat: 37.8 };
-const camera = { ...routeCenter, scale: 1 };
+const globeCenter = { lon: 26, lat: 29 };
+const camera = { ...globeCenter, scale: .19 };
 const markerNodes = [];
 const labelNodes = [];
 const routeNodes = [];
@@ -56,7 +65,8 @@ const mapLabelNodes = [];
 const pointers = new Map();
 const phaseButtons = [];
 let selectedIndex = 0;
-let mode = 'route';
+let mode = 'globe';
+let awaitingIntro = true;
 let animation;
 let drawFrame;
 let surface;
@@ -186,7 +196,8 @@ function setupMarkers() {
         const y = event.clientY - box.top;
         const nearest = stops.reduce((candidate, place, index) => {
           const point = project(place.coords, view);
-          const distance = point.visible ? Math.hypot(point.x - x, point.y - y) : Infinity;
+          const distance = markerNodes[index].getAttribute('visibility') === 'visible'
+            ? Math.hypot(point.x - x, point.y - y) : Infinity;
           return distance < candidate.distance ? { index, distance } : candidate;
         }, { index: i, distance: Infinity });
         chooseStop(nearest.index);
@@ -217,7 +228,6 @@ function setupMarkers() {
 }
 
 function setupPhases() {
-  const phaseControls = find('#phase-controls');
   phases.forEach(phase => {
     const button = html('button', 'phase-button', phase.name);
     button.type = 'button';
@@ -240,7 +250,20 @@ function renderScene(stop) {
   image.alt = scene.alt;
   image.decoding = 'async';
   const caption = html('figcaption', '', scene.caption);
-  figure.append(image, caption);
+  const enlarge = html('button', 'scene-enlarge');
+  enlarge.type = 'button';
+  enlarge.setAttribute('aria-label', `View image for ${stop.name}`);
+  enlarge.append(image);
+  enlarge.addEventListener('click', () => {
+    imageViewer.querySelector('h2').textContent = stop.name;
+    const fullImage = imageViewer.querySelector('img');
+    fullImage.src = image.src;
+    fullImage.alt = scene.alt;
+    imageViewer.querySelector('figcaption').textContent = scene.caption;
+    setPlaying(false);
+    imageViewer.showModal();
+  });
+  figure.append(enlarge, caption);
   return figure;
 }
 
@@ -300,6 +323,7 @@ function bookmark(i) {
 }
 
 function chooseStop(i) {
+  if (awaitingIntro) setMode('route');
   setPlaying(false);
   selectStop(i);
 }
@@ -343,6 +367,7 @@ function setPlaying(playing) {
   playButton.firstElementChild.textContent = playing ? 'Ⅱ' : '▶';
   find('#play-label').textContent = playing ? 'Pause' : 'Play';
   if (!playing) return;
+  if (awaitingIntro) setMode('route');
   if (selectedIndex === stops.length - 1) selectStop(0);
   playTimer = setInterval(() => {
     selectStop(selectedIndex + 1);
@@ -350,27 +375,42 @@ function setPlaying(playing) {
   }, 4600);
 }
 
-function baseRadius(width, height) {
-  return Math.min(width / .33, height / .222);
-}
-
-function getView() {
+function cameraFrame() {
+  const mapBox = mapFrame.getBoundingClientRect();
   const width = mapFrame.clientWidth;
   const height = mapFrame.clientHeight;
+  const padding = clamp(width * .035, 12, 42);
+  const scene = storyPanel.getBoundingClientRect();
+  const landscapePanel = !storyPanel.hidden && width >= 530 && scene.width < width * .56;
+  const lowPanel = !storyPanel.hidden && !landscapePanel;
+  const top = Math.max(0, phaseControls.getBoundingClientRect().bottom - mapBox.top) + 8;
+  const bottom = Math.min(
+    height - 8,
+    timelinePanel.getBoundingClientRect().top - mapBox.top - 8,
+    mapKey.getBoundingClientRect().top - mapBox.top - 7,
+    lowPanel ? scene.top - mapBox.top - 7 : height,
+  );
+  const usableHeight = Math.max(54, bottom - top);
+  const right = landscapePanel ? scene.left - mapBox.left - padding * .55 : width - padding;
+  const usableWidth = Math.max(54, right - padding);
+  const baseline = Math.min(usableWidth / .325, usableHeight / .215);
   return {
-    ...camera,
-    x: width / 2,
-    y: height / 2,
-    radius: baseRadius(width, height) * camera.scale,
     width,
     height,
+    x: padding + usableWidth / 2,
+    y: top + usableHeight / 2,
+    baseline,
+    world: Math.min(usableWidth * .47, usableHeight * .476) / baseline,
   };
 }
 
+function getView() {
+  const frame = cameraFrame();
+  return { ...frame, ...camera, radius: frame.baseline * camera.scale };
+}
+
 function globeScale() {
-  const { width, height } = getView();
-  if (!width || !height) return .19;
-  return Math.min(width, height) * .435 / baseRadius(width, height);
+  return cameraFrame().world;
 }
 
 function draw() {
@@ -415,7 +455,7 @@ function draw() {
     scaleBar.style.width = `${view.radius * kilometers / 6371}px`;
     scaleBar.textContent = `${kilometers} km`;
   }
-  zoomOut.disabled = view.scale <= globeScale() + .005;
+  zoomOut.disabled = view.scale <= view.world + .005;
   zoomIn.disabled = view.scale >= 2.8;
 }
 
@@ -423,8 +463,13 @@ function queueDraw() {
   if (drawFrame === undefined) drawFrame = requestAnimationFrame(draw);
 }
 
-function goTo(target) {
+function stopCameraAnimation() {
   cancelAnimationFrame(animation);
+  animation = undefined;
+}
+
+function goTo(target) {
+  stopCameraAnimation();
   if (reducedMotion.matches) {
     Object.assign(camera, target);
     queueDraw();
@@ -443,22 +488,34 @@ function goTo(target) {
     camera.scale = origin.scale * Math.exp(logScale * t);
     queueDraw();
     animation = progress < 1 ? requestAnimationFrame(animate) : undefined;
+    if (progress === 1 && mode === 'globe') camera.scale = globeScale();
   };
   animation = requestAnimationFrame(animate);
 }
 
-function setMode(nextMode) {
-  mode = nextMode;
+function syncMode() {
   viewRoute.setAttribute('aria-pressed', String(mode === 'route'));
   viewGlobe.setAttribute('aria-pressed', String(mode === 'globe'));
-  if (mode === 'route') goTo({ ...routeCenter, scale: 1 });
-  if (mode === 'globe') goTo({ lon: 26, lat: 29, scale: globeScale() });
 }
 
-function changeZoom(factor) {
+function setMode(nextMode) {
+  awaitingIntro = false;
+  mode = nextMode;
+  syncMode();
+  if (mode === 'route') goTo({ ...routeCenter, scale: 1 });
+  if (mode === 'globe') goTo({ ...globeCenter, scale: globeScale() });
+}
+
+function changeZoom(factor, { animate = true } = {}) {
   const scale = clamp(camera.scale * factor, globeScale(), 2.85);
   setMode('free');
-  goTo({ ...camera, scale });
+  if (animate) {
+    goTo({ ...camera, scale });
+  } else {
+    stopCameraAnimation();
+    camera.scale = scale;
+    queueDraw();
+  }
 }
 
 function touchGap() {
@@ -469,8 +526,7 @@ function touchGap() {
 
 function startPointer(event) {
   if (event.target.closest('button') || event.button !== 0) return;
-  cancelAnimationFrame(animation);
-  animation = undefined;
+  stopCameraAnimation();
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   const gap = touchGap();
   if (pointers.size === 1 || gap) {
@@ -521,7 +577,7 @@ function keyboardGlobe(event) {
   const movement = movements[event.key];
   if (!movement) return;
   event.preventDefault();
-  cancelAnimationFrame(animation);
+  stopCameraAnimation();
   setMode('free');
   camera.lon = wrapLon(camera.lon + movement[0]);
   camera.lat = clamp(camera.lat + movement[1], -83, 83);
@@ -544,12 +600,22 @@ setupRoute();
 setupMarkers();
 setupPhases();
 const timeline = makeTimeline(find('#stop-timeline'), stops, phases, chooseStop);
-if (!selectFromHash()) selectStop(0, { updateHash: false, announce: false });
+if (location.hash.startsWith('#stop=') && indexById.has(location.hash.slice(6))) {
+  awaitingIntro = false;
+  mode = 'route';
+  Object.assign(camera, routeCenter, { scale: 1 });
+}
+syncMode();
+if (!selectFromHash()) selectStop(0, { updateHash: false, announce: false, move: false });
+if (mode === 'globe') camera.scale = globeScale();
 
-new ResizeObserver(() => {
+function resizeMap() {
   if (mode === 'globe' && !animation) camera.scale = globeScale();
   queueDraw();
-}).observe(mapFrame);
+}
+
+const observer = new ResizeObserver(resizeMap);
+for (const node of [mapFrame, phaseControls, timelinePanel, storyPanel]) observer.observe(node);
 surface.ready?.then(queueDraw);
 queueDraw();
 
@@ -562,10 +628,10 @@ reset.addEventListener('click', () => setMode('route'));
 viewRoute.addEventListener('click', () => setMode('route'));
 viewGlobe.addEventListener('click', () => setMode('globe'));
 sceneToggle.addEventListener('click', () => {
-  const panel = find('#story-panel');
-  panel.hidden = !panel.hidden;
-  sceneToggle.setAttribute('aria-expanded', String(!panel.hidden));
-  find('.atlas-window').classList.toggle('scene-hidden', panel.hidden);
+  storyPanel.hidden = !storyPanel.hidden;
+  sceneToggle.setAttribute('aria-expanded', String(!storyPanel.hidden));
+  find('.atlas-window').classList.toggle('scene-hidden', storyPanel.hidden);
+  resizeMap();
 });
 mapFrame.addEventListener('pointerdown', startPointer);
 mapFrame.addEventListener('pointermove', movePointer);
@@ -573,11 +639,46 @@ window.addEventListener('pointerup', endPointer);
 window.addEventListener('pointercancel', endPointer);
 mapFrame.addEventListener('keydown', keyboardGlobe);
 mapFrame.addEventListener('wheel', event => {
-  if (!event.ctrlKey && document.activeElement !== mapFrame) return;
   event.preventDefault();
-  changeZoom(event.deltaY < 0 ? 1.18 : 1 / 1.18);
+  const sensitivity = event.deltaMode ? .05 : .0025;
+  const factor = Math.exp(clamp(-event.deltaY * sensitivity, -.45, .45));
+  changeZoom(factor, { animate: false });
 }, { passive: false });
-find('.site-nav a').addEventListener('click', () => { sources.open = true; });
+navSources.addEventListener('click', event => {
+  event.preventDefault();
+  sources.open = true;
+  closeSources.focus({ preventScroll: true });
+});
+function dismissSources() {
+  sources.open = false;
+  navSources.focus({ preventScroll: true });
+}
+closeSources.addEventListener('click', dismissSources);
+sources.querySelector('summary').addEventListener('click', event => {
+  event.preventDefault();
+  dismissSources();
+});
+sources.addEventListener('toggle', () => navSources.setAttribute('aria-expanded', String(sources.open)));
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && sources.open && sources.contains(document.activeElement)) dismissSources();
+});
+if (document.fullscreenEnabled && document.documentElement.requestFullscreen) {
+  fullscreen.hidden = false;
+  fullscreen.addEventListener('click', async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      announcement.textContent = 'Fullscreen is unavailable in this browser.';
+    }
+  });
+  document.addEventListener('fullscreenchange', () => {
+    const label = document.fullscreenElement ? 'Exit fullscreen' : 'Enter fullscreen';
+    fullscreen.setAttribute('aria-label', label);
+    fullscreen.title = label;
+    resizeMap();
+  });
+}
 window.addEventListener('hashchange', selectFromHash);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) setPlaying(false);
