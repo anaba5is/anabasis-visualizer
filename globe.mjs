@@ -8,7 +8,20 @@ const REGIONAL_TEXTURE_URL = new URL('./assets/globe-detail.webp', import.meta.u
 const REGIONAL_BOUNDS = [20, 25, 52, 47];
 const DETAIL_MIN_RADIUS = 450;
 const DETAIL_FULL_RADIUS = 1000;
-const DETAIL_BLEND_DEGREES = 1.6;
+const DETAIL_BLEND_DEGREES = 2.2;
+const HALO_RATIO = .085;
+const HALO_PIXELS = 36;
+const SHADE = {
+  atmosphere: [57, 102, 121],
+  atmosphereLight: [41, 48, 43],
+  ocean: [15, 31, 40],
+  oceanCenter: [12, 23, 25],
+  oceanLight: [3, 8, 12],
+  land: [89, 84, 74],
+  landLight: [118, 105, 79],
+};
+
+const shaderColor = values => `vec3(${values.map(channel => (channel / 255).toFixed(6)).join(', ')})`;
 
 function projectPoint([longitude, latitude], lon, sinCenter, cosCenter, x, y, radius) {
   const lat = latitude * RADIANS;
@@ -93,7 +106,8 @@ uniform vec3 north;
 uniform vec3 center;
 
 const float PI = 3.141592653589793;
-const vec3 atmosphere = vec3(0.27, 0.48, 0.46);
+const vec3 atmosphere = ${shaderColor(SHADE.atmosphere)};
+const vec3 atmosphereLight = ${shaderColor(SHADE.atmosphereLight)};
 const vec3 incidentLight = vec3(-0.49, 0.56, 0.67);
 
 void main() {
@@ -101,11 +115,17 @@ void main() {
   point.y *= -1.0;
   float edge = length(point);
   float softness = 1.3 / min(radius.x, radius.y);
+  float skyLight = clamp(dot(point, incidentLight.xy), 0.0, 1.0);
+  vec3 sky = atmosphere + skyLight * atmosphereLight;
 
   if (edge > 1.0) {
-    float haloWidth = min(0.085, 28.0 * softness);
-    float alpha = 0.29 * exp(-4.8 * (edge - 1.0) / haloWidth);
-    gl_FragColor = vec4(atmosphere, edge <= (1.0 + haloWidth) ? alpha : 0.0);
+    float haloWidth = min(${HALO_RATIO}, ${HALO_PIXELS}.0 / min(radius.x, radius.y));
+    if (edge > 1.0 + haloWidth) {
+      gl_FragColor = vec4(0.0);
+    } else {
+      float alpha = 0.30 * exp(-4.8 * (edge - 1.0) / haloWidth);
+      gl_FragColor = vec4(sky * alpha, alpha);
+    }
     return;
   }
 
@@ -143,15 +163,15 @@ void main() {
   float illumination = max(0.0, dot(normal, incidentLight));
   float gray = terrainEnabled && sampleColor.a > 0.0 ? sampleColor.r / sampleColor.a : 206.0 / 255.0;
   float landTone = clamp(0.50 + (gray - 0.78) * 2.55, 0.0, 1.0);
-  vec3 stone = mix(vec3(0.35, 0.33, 0.29), vec3(0.81, 0.74, 0.60), landTone);
-  vec3 ocean = mix(vec3(0.058, 0.118, 0.133), vec3(0.104, 0.207, 0.222), z);
+  vec3 stone = ${shaderColor(SHADE.land)} + landTone * ${shaderColor(SHADE.landLight)};
+  float glint = illumination * illumination;
+  vec3 ocean = ${shaderColor(SHADE.ocean)} + z * ${shaderColor(SHADE.oceanCenter)}
+    + glint * glint * ${shaderColor(SHADE.oceanLight)};
   vec3 surface = mix(ocean, stone, sampleColor.a) * (0.79 + 0.25 * illumination);
 
-  float limb = pow(1.0 - z, 3.1);
-  vec3 color = mix(surface, atmosphere, 0.40 * limb);
-  color += 0.043 * limb * max(0.0, dot(normal.xy, incidentLight.xy));
+  vec3 color = mix(surface, sky, 0.40 * pow(1.0 - z, 3.1));
   float coverage = 1.0 - 0.70 * smoothstep(1.0 - softness, 1.0, edge);
-  gl_FragColor = vec4(color, coverage);
+  gl_FragColor = vec4(color * coverage, coverage);
 }`;
 
 function compileShader(gl, type, source) {
@@ -164,7 +184,7 @@ function compileShader(gl, type, source) {
 }
 
 function drawGlobePixels(gl, width, height, x, y, radiusX, radiusY) {
-  const halo = 1 + Math.min(.085, 36.4 / Math.min(radiusX, radiusY));
+  const halo = 1 + Math.min(HALO_RATIO, HALO_PIXELS / Math.min(radiusX, radiusY));
   const left = Math.max(0, Math.floor(x - radiusX * halo));
   const right = Math.min(width, Math.ceil(x + radiusX * halo));
   const bottom = Math.max(0, Math.floor(height - y - radiusY * halo));
@@ -184,14 +204,26 @@ function drawGlobePixels(gl, width, height, x, y, radiusX, radiusY) {
   gl.disable(gl.SCISSOR_TEST);
 }
 
+function globeClip({ width, height, x, y, radius }, scale) {
+  const farX = Math.max(Math.abs(x), Math.abs(width - x));
+  const farY = Math.max(Math.abs(y), Math.abs(height - y));
+  if (radius >= Math.hypot(farX, farY)) return 'none';
+
+  // The page's clip is independent of the canvas alpha channel. It prevents a
+  // compositor from exposing the rectangular framebuffer around the globe.
+  const extent = radius + Math.min(radius * HALO_RATIO, HALO_PIXELS / scale) + 1 / scale;
+  return `circle(${extent.toFixed(2)}px at ${x.toFixed(2)}px ${y.toFixed(2)}px)`;
+}
+
 function createWebGLRenderer(canvas) {
   const gl = canvas.getContext('webgl', {
     alpha: true,
     antialias: false,
     depth: false,
-    premultipliedAlpha: false,
+    premultipliedAlpha: true,
   });
-  if (!gl) return null;
+  const attributes = gl?.getContextAttributes();
+  if (!(attributes?.alpha && attributes.premultipliedAlpha)) return null;
 
   const explicitGradient = gl.getExtension('OES_standard_derivatives') && gl.getExtension('EXT_shader_texture_lod');
   const extensions = explicitGradient ? `#extension GL_OES_standard_derivatives : enable
@@ -200,15 +232,23 @@ function createWebGLRenderer(canvas) {
 ` : '';
   const vertex = compileShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
   const fragment = compileShader(gl, gl.FRAGMENT_SHADER, extensions + fragmentShaderSource);
-  if (!vertex || !fragment) return null;
+  if (!vertex || !fragment) {
+    if (vertex) gl.deleteShader(vertex);
+    if (fragment) gl.deleteShader(fragment);
+    return null;
+  }
   const program = gl.createProgram();
   gl.attachShader(program, vertex);
   gl.attachShader(program, fragment);
   gl.linkProgram(program);
   gl.deleteShader(vertex);
   gl.deleteShader(fragment);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null;
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    gl.deleteProgram(program);
+    return null;
+  }
   gl.useProgram(program);
+  gl.clearColor(0, 0, 0, 0);
 
   const uniforms = Object.fromEntries(
     ['height', 'origin', 'radius', 'east', 'north', 'center', 'regionalLoaded', 'terrainEnabled', 'regionalBounds']
@@ -244,6 +284,7 @@ function createWebGLRenderer(canvas) {
   gl.uniform4fv(uniforms.regionalBounds, REGIONAL_BOUNDS);
   gl.activeTexture(gl.TEXTURE0);
   const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  let clip;
 
   return {
     setImage(image) {
@@ -265,9 +306,9 @@ function createWebGLRenderer(canvas) {
     draw(camera) {
       if (gl.isContextLost()) return false;
       const scale = Math.min(globalThis.devicePixelRatio || 1, 2);
-      const width = Math.max(1, Math.round(camera.width * scale));
-      const height = Math.max(1, Math.round(camera.height * scale));
-      resize(canvas, width, height);
+      resize(canvas, Math.max(1, Math.round(camera.width * scale)), Math.max(1, Math.round(camera.height * scale)));
+      const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
+      if (!width || !height) return false;
 
       const xScale = width / camera.width;
       const yScale = height / camera.height;
@@ -275,6 +316,11 @@ function createWebGLRenderer(canvas) {
       const y = camera.y * yScale;
       const radiusX = camera.radius * xScale;
       const radiusY = camera.radius * yScale;
+      const nextClip = globeClip(camera, Math.min(xScale, yScale));
+      if (nextClip !== clip) {
+        clip = nextClip;
+        canvas.style.clipPath = clip;
+      }
       const { east, north, center } = basis(camera);
       gl.viewport(0, 0, width, height);
       gl.uniform1f(uniforms.height, height);
@@ -361,6 +407,13 @@ function createSoftwareRenderer(canvas, output) {
   let terrain;
   let regionalTerrain;
   let frame;
+  const [skyR, skyG, skyB] = SHADE.atmosphere;
+  const [litSkyR, litSkyG, litSkyB] = SHADE.atmosphereLight;
+  const [oceanR, oceanG, oceanB] = SHADE.ocean;
+  const [deepR, deepG, deepB] = SHADE.oceanCenter;
+  const [glintR, glintG, glintB] = SHADE.oceanLight;
+  const [landR, landG, landB] = SHADE.land;
+  const [litLandR, litLandG, litLandB] = SHADE.landLight;
 
   return {
     setImage(image) {
@@ -380,7 +433,7 @@ function createSoftwareRenderer(canvas, output) {
       const xScale = width / camera.width;
       const yScale = height / camera.height;
       const pixelRadius = Math.min(xScale, yScale) * camera.radius;
-      const halo = Math.min(0.085, 36 / pixelRadius);
+      const halo = Math.min(HALO_RATIO, HALO_PIXELS / pixelRadius);
       const haloDistance = (1 + halo) ** 2;
       const limbWidth = 1.3 / pixelRadius;
       const detailZoom = regionalTerrain
@@ -401,12 +454,17 @@ function createSoftwareRenderer(canvas, output) {
           const x = ((column + 0.5) / xScale - camera.x) / camera.radius;
           const distance = x * x + ySquared;
           const i = (row * width + column) * 4;
+          const direction = -0.49 * x + 0.56 * y;
+          const skyLight = Math.max(0, direction);
+          const hazeR = skyR + litSkyR * skyLight;
+          const hazeG = skyG + litSkyG * skyLight;
+          const hazeB = skyB + litSkyB * skyLight;
           if (distance > 1) {
             const intensity = Math.exp(-4.8 * (Math.sqrt(distance) - 1) / halo);
-            pixels[i] = 69;
-            pixels[i + 1] = 122;
-            pixels[i + 2] = 117;
-            pixels[i + 3] = 74 * intensity;
+            pixels[i] = hazeR;
+            pixels[i + 1] = hazeG;
+            pixels[i + 2] = hazeB;
+            pixels[i + 3] = 255 * .30 * intensity;
             continue;
           }
 
@@ -439,16 +497,19 @@ function createSoftwareRenderer(canvas, output) {
             }
           }
 
-          const light = 0.79 + 0.25 * Math.max(0, -0.49 * x + 0.56 * y + 0.67 * z);
+          const illumination = Math.max(0, direction + 0.67 * z);
+          const light = 0.79 + 0.25 * illumination;
+          const facingLight = illumination * illumination;
+          const glint = facingLight * facingLight;
           const shade = terrainEnabled && land > 0 ? gray / land : 206 / 255;
           const stone = Math.max(0, Math.min(1, 0.50 + (shade - 0.78) * 2.55));
           const rim = 0.40 * (1 - z) ** 3.1;
           land /= 255;
           const sea = 1 - land;
-          pixels[i] = (1 - rim) * light * (sea * (15 + 12 * z) + land * (89 + 118 * stone)) + rim * 69;
-          pixels[i + 1] = (1 - rim) * light * (sea * (30 + 23 * z) + land * (84 + 105 * stone)) + rim * 122;
-          pixels[i + 2] = (1 - rim) * light * (sea * (34 + 23 * z) + land * (74 + 79 * stone)) + rim * 117;
-          pixels[i + 3] = 255 * Math.min(1, 0.3 + 0.7 * (1 - Math.sqrt(distance)) / limbWidth);
+          pixels[i] = (1 - rim) * light * (sea * (oceanR + deepR * z + glintR * glint) + land * (landR + litLandR * stone)) + rim * hazeR;
+          pixels[i + 1] = (1 - rim) * light * (sea * (oceanG + deepG * z + glintG * glint) + land * (landG + litLandG * stone)) + rim * hazeG;
+          pixels[i + 2] = (1 - rim) * light * (sea * (oceanB + deepB * z + glintB * glint) + land * (landB + litLandB * stone)) + rim * hazeB;
+          pixels[i + 3] = 255 * (1 - .70 * smoothstep((Math.sqrt(distance) - 1 + limbWidth) / limbWidth));
         }
       }
 
@@ -510,7 +571,16 @@ export function createGlobe(canvas) {
     if (!(camera.radius > 0 && camera.width > 0 && camera.height > 0)) return;
     latest = { ...camera };
     if (!regionalRequested && needsRegionalTexture(camera)) requestRegionalTexture();
-    if (!hardware?.draw(camera)) softwareRenderer()?.draw(camera);
+    if (!hardware?.draw(camera)) {
+      softwareRenderer()?.draw(camera);
+      return;
+    }
+    if (fallback) {
+      fallback.remove();
+      fallback = undefined;
+      software = undefined;
+      canvas.style.visibility = originalVisibility;
+    }
   }
 
   canvas.addEventListener('webglcontextlost', event => {
@@ -524,11 +594,7 @@ export function createGlobe(canvas) {
     if (!hardware) return;
     if (terrain) hardware.setImage(terrain);
     if (regionalTerrain) hardware.setRegionalImage(regionalTerrain);
-    if (latest && !hardware.draw(latest)) return;
-    fallback?.remove();
-    fallback = undefined;
-    software = undefined;
-    canvas.style.visibility = originalVisibility;
+    if (latest) draw(latest);
   });
 
   const ready = new Promise(resolve => {

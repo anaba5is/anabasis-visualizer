@@ -1,0 +1,97 @@
+@font-face {
+  font-family: 'Commissioner';
+  font-style: normal;
+  font-weight: 400 750;
+  font-display: swap;
+  src: url("./assets/fonts/commissioner-normal-latin-ext.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Commissioner';
+  font-style: normal;
+  font-weight: 400 750;
+  font-display: swap;
+  src: url("./assets/fonts/commissioner-normal-latin.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'GFS Didot';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/gfs-didot-normal-greek-ext.woff2") format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+
+@font-face {
+  font-family: 'GFS Didot';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/gfs-didot-normal-greek.woff2") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+
+@font-face {
+  font-family: 'GFS Didot';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/gfs-didot-normal-latin.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --display: "GFS Didot", Georgia, serif;
+  --body: "Commissioner", system-ui, sans-serif;
+}
+:root:not([data-typeface="current"], [data-typeface="scholar"]) .stop-title,
+:root:not([data-typeface="current"], [data-typeface="scholar"]) .scene-viewer-copy h3 { font-style: normal; }
+:root:not([data-typeface="current"]) #stop-counter,
+:root:not([data-typeface="current"]) .map-scale {
+  font-family: system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+:root:not([data-typeface="current"]) .wordmark h1 {
+  font-size: clamp(1.37rem, 2vw, 1.95rem);
+  letter-spacing: -.025em;
+}
+:root:not([data-typeface="current"]) .journey-intro h2 {
+  font-size: clamp(3rem, 4.75vw, 6.35rem);
+  line-height: .98;
+  letter-spacing: -.047em;
+}
+:root:not([data-typeface="current"]) .story-panel .stop-name {
+  font-size: clamp(1.9rem, 2.62vw, 3rem);
+  line-height: 1.02;
+}
+:root:not([data-typeface="current"]) .scene-viewer h2 {
+  font-size: clamp(1.4rem, 3.65vw, 2.8rem);
+  line-height: 1.04;
+}
+:root:not([data-typeface="current"]) .phone-place {
+  font-size: clamp(.97rem, 3.67vw, 1.21rem);
+  letter-spacing: -.025em;
+}
+
+@media (max-width: 52rem) {
+  :root:not([data-typeface="current"]) .wordmark h1 {
+    font-size: clamp(1.02rem, 4.38vw, 1.52rem);
+  }
+}
+
+@media (min-width: 52.01rem) and (max-height: 44rem) {
+  :root:not([data-typeface="current"]) .journey-intro h2 {
+    font-size: clamp(2.55rem, 4.29vw, 4.5rem);
+  }
+}
+
+:root:not([data-typeface="current"]) .phone-place {
+  display: -webkit-box;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}

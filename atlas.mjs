@@ -2,12 +2,14 @@ import { stops, journeyChapters } from './story.mjs?v=4';
 import { captions } from './captions.mjs?v=4';
 
 import { scenes } from './scenes.mjs';
-import { mapLabels, rivers, routeWaypoints, uncertainLegs } from './map-data.mjs?v=2';
-import { createGlobe, createProjector } from './globe.mjs?v=4';
+import { mapLabels, rivers, routeWaypoints, uncertainLegs } from './map-data.mjs?v=6';
+import { createGlobe, createProjector } from './globe.mjs?v=8';
 import { makeTimeline } from './timeline.mjs?v=4';
 import { createPlayback } from './playback.mjs';
-import { addHistoricalLayer } from './historical-layer.mjs?v=4';
-import { historicalSources } from './historical-data.mjs';
+import { addHistoricalLayer } from './historical-layer.mjs?v=8';
+import { historicalSources, politicalRegions } from './historical-data.mjs?v=6';
+import { createMapLabels } from './map-labels.mjs';
+import { connectPopover } from './popover.mjs';
 
 const phases = [
   { name: 'March inland', color: '#f1b66f', timelineColor: '#a4662a' },
@@ -64,6 +66,13 @@ const navSources = find('.site-nav a');
 const closeSources = find('#close-sources');
 const fullscreen = find('#fullscreen-toggle');
 const imageViewer = find('#image-viewer');
+const readerImage = imageViewer.querySelector('img');
+const readerCaption = imageViewer.querySelector('figcaption');
+const readerRegion = find('#scene-viewer-region');
+const readerCopy = find('#scene-viewer-copy');
+const timelineBook = find('#timeline-book');
+const stopCounter = find('#stop-counter');
+const playLabel = find('#play-label');
 const readerTitle = find('#image-viewer-title');
 const readerPrevious = find('#reader-previous');
 const readerNext = find('#reader-next');
@@ -81,6 +90,7 @@ const routeNodes = [];
 const gridNodes = [];
 const riverNodes = [];
 const mapLabelNodes = [];
+const labelRenderer = createMapLabels(stops, labelNodes, mapLabelNodes, labelLayouts);
 const pointers = new Map();
 const phaseButtons = [];
 let selectedIndex = 0;
@@ -175,15 +185,12 @@ function setupBase() {
     riverNodes.push({ node, lines: river.lines });
     base.append(node);
   }
-  const labels = [
-    ...mapLabels.map(label => label.name === 'Black Sea' ? { ...label, coords: [36.8, 42.7] } : label),
-    { name: 'Euphrates', kind: 'river', coords: [40.9, 33.5] },
-    { name: 'Tigris', kind: 'river', coords: [45.2, 34] },
-  ];
-  for (const { name, kind, coords } of labels) {
-    const extraClass = name === 'Aegean Sea' ? ' aegean' : '';
-    const node = svg('text', { class: `map-label ${kind}${extraClass}` }, name);
-    mapLabelNodes.push({ node, coords });
+  const labels = [...mapLabels].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+  for (const label of labels) {
+    const { name, kind, minScale } = label;
+    const minorWater = kind === 'sea' && minScale > 1.1;
+    const node = svg('text', { class: `map-label ${kind}${minorWater ? ' strait' : ''}` }, name);
+    mapLabelNodes.push({ node, ...label });
     base.append(node);
   }
   map.append(base);
@@ -285,8 +292,14 @@ function setupMarkers() {
         chooseStop(i);
       }
     });
-    const preview = () => labelNodes[i].classList.add('preview');
-    const unpreview = () => labelNodes[i].classList.remove('preview');
+    const setPreview = active => {
+      labelNodes[i].classList.toggle('preview', active);
+      labelRenderer.forget(labelNodes[i]);
+      lastProjectedView = undefined;
+      queueDraw();
+    };
+    const preview = () => setPreview(true);
+    const unpreview = () => setPreview(false);
     marker.addEventListener('pointerenter', preview);
     marker.addEventListener('pointerleave', unpreview);
     marker.addEventListener('focus', preview);
@@ -363,12 +376,11 @@ function passageNotes(stop, scene) {
 
 function renderReader(stop, i) {
   const scene = scenes[stop.id];
-  find('#scene-viewer-region').textContent = placeAndBook(stop);
+  readerRegion.textContent = placeAndBook(stop);
   readerTitle.textContent = stop.name;
-  const image = imageViewer.querySelector('img');
-  image.src = `./assets/${scene.file}`;
-  image.alt = scene.alt;
-  imageViewer.querySelector('figcaption').textContent = scene.caption;
+  readerImage.src = `./assets/${scene.file}`;
+  readerImage.alt = scene.alt;
+  readerCaption.textContent = scene.caption;
   const content = document.createDocumentFragment();
   const chapter = journeyChapters[stop.phase];
   if (chapter && stops[i - 1]?.phase !== stop.phase) {
@@ -383,7 +395,7 @@ function renderReader(stop, i) {
   content.append(html('h3', '', stop.title), html('p', '', stop.summary), html('p', '', stop.detail));
   if (stop.whyItMatters) content.append(html('p', 'reader-takeaway', stop.whyItMatters));
   content.append(passageNotes(stop, scene));
-  find('#scene-viewer-copy').replaceChildren(content);
+  readerCopy.replaceChildren(content);
   readerPrevious.disabled = i === 0;
   readerNext.disabled = i === stops.length - 1;
   imageViewer.scrollTop = 0;
@@ -432,8 +444,8 @@ function renderStory(stop, i) {
   phoneStage.textContent = `Book ${book} · ${i + 1} / ${stops.length}`;
   phonePlace.textContent = stop.name;
   phoneScene.setAttribute('aria-label', `Details for ${stop.name}`);
-  find('#timeline-book').textContent = `Book ${book}`;
-  find('#stop-counter').textContent = `${String(i + 1).padStart(2, '0')} / ${stops.length}`;
+  timelineBook.textContent = `Book ${book}`;
+  stopCounter.textContent = `${String(i + 1).padStart(2, '0')} / ${stops.length}`;
   previousButton.disabled = i === 0;
   nextButton.disabled = i === stops.length - 1;
 }
@@ -460,6 +472,7 @@ function selectStop(i, { updateHash = true, announce = true, move = true } = {})
     const here = i === index;
     marker.classList.toggle('selected', here);
     marker.setAttribute('aria-pressed', String(here));
+    if (labelNodes[index].classList.contains('selected') !== here) labelRenderer.forget(labelNodes[index]);
     labelNodes[index].classList.toggle('selected', here);
     routeNodes[index]?.line.classList.toggle('current', here);
     routeNodes[index]?.line.classList.toggle('traversed', index <= i);
@@ -486,7 +499,7 @@ function syncPlayButton(playing) {
   const label = playing ? 'Pause' : finished ? 'Replay' : 'Play';
   playButton.setAttribute('aria-label', `${label} journey`);
   playButton.firstElementChild.textContent = playing ? 'Ⅱ' : '▶';
-  find('#play-label').textContent = label;
+  playLabel.textContent = label;
 }
 
 function followLeg(i) {
@@ -565,6 +578,7 @@ function measureCameraFrame() {
     x: left + usableWidth / 2,
     y: top + usableHeight / 2,
     baseline,
+    labelBounds: { left, top, right, bottom },
     world: Math.min(usableWidth * .48, usableHeight * .485) / baseline,
   };
 }
@@ -603,21 +617,24 @@ function draw() {
   lastProjectedView = overlayKey;
   const viewBox = `0 0 ${view.width} ${view.height}`;
   if (map.getAttribute('viewBox') !== viewBox) map.setAttribute('viewBox', viewBox);
-  drawHistoricalLayer(view, layers, layers.route ? view.locate(stops[selectedIndex].coords) : null);
+  const positions = stops.map(stop => view.locate(stop.coords));
   routeLayer.style.display = layers.route ? '' : 'none';
   markerLayer.style.display = layers.route ? '' : 'none';
   namesLayer.style.display = layers.route && layers.places ? '' : 'none';
+  const { occupied: stopLabels, selectedBox } = labelRenderer.drawStops(view, positions, selectedIndex, layers);
+  const routeAnchor = layers.route ? { ...positions[selectedIndex], labelBox: selectedBox } : null;
+  const historicalLabels = drawHistoricalLayer(view, layers, routeAnchor) ?? [];
+  const pinBounds = layers.route ? positions.flatMap((point, i) => {
+    if (!point.visible || (i !== selectedIndex && view.scale <= .39)) return [];
+    const r = i === selectedIndex ? 12 : 7;
+    return [{ left: point.x - r, right: point.x + r, top: point.y - r, bottom: point.y + r }];
+  }) : [];
+  labelRenderer.drawPlaces(view, [...stopLabels, ...historicalLabels, ...pinBounds], layers.places);
   for (const { node, points, regional } of gridNodes) {
     node.setAttribute('d', layers.grid && regional === (view.scale >= .52) ? linePath(points, view) : '');
   }
   for (const { node, lines } of riverNodes) {
     node.setAttribute('d', view.scale > .48 ? lines.map(line => linePath(line, view)).join('') : '');
-  }
-  for (const { node, coords } of mapLabelNodes) {
-    const { x, y, visible } = view.locate(coords);
-    node.setAttribute('visibility', visible && layers.places && view.scale > .56 ? 'visible' : 'hidden');
-    node.setAttribute('x', x);
-    node.setAttribute('y', y);
   }
   for (const { shadow, line, points } of layers.route ? routeNodes.slice(1) : []) {
     const d = linePath(points, view);
@@ -625,17 +642,13 @@ function draw() {
     line.setAttribute('d', d);
   }
   stops.forEach((stop, i) => {
-    const { x, y, visible } = view.locate(stop.coords);
+    const { x, y, visible } = positions[i];
     const inFrame = visible && x > 5 && x < view.width - 5 && y > 5 && y < view.height - 5;
     const showMarker = inFrame && (view.scale > .39 || i === selectedIndex);
     const marker = markerNodes[i];
     marker.setAttribute('visibility', showMarker ? 'visible' : 'hidden');
     marker.setAttribute('tabindex', showMarker ? '0' : '-1');
     marker.setAttribute('transform', `translate(${x} ${y})`);
-    const { dx = 0, dy = -16 } = labelLayouts[stop.id] ?? {};
-    labelNodes[i].setAttribute('x', x + dx);
-    labelNodes[i].setAttribute('y', y + dy);
-    labelNodes[i].setAttribute('visibility', inFrame && (view.scale > .5 || i === selectedIndex) ? 'visible' : 'hidden');
   });
   drawTrail(view);
   scaleBar.hidden = view.scale < .5;
@@ -832,6 +845,16 @@ syncMode();
 if (!selectFromHash()) selectStop(0, { updateHash: false, announce: false, move: false });
 if (mode === 'globe') camera.scale = globeScale();
 
+function refreshTypography() {
+  labelRenderer.clearMetrics();
+  drawHistoricalLayer.refreshMetrics?.();
+  lastProjectedView = undefined;
+  resizeMap();
+}
+
+document.addEventListener('atlas:type-preview', refreshTypography);
+document.fonts.addEventListener('loadingdone', refreshTypography);
+
 function resizeMap() {
   frameBounds = undefined;
   if (mode === 'globe' && !animation) camera.scale = globeScale();
@@ -952,38 +975,26 @@ if (document.fullscreenEnabled && document.documentElement.requestFullscreen) {
     resizeMap();
   });
 }
-function connectPopover(trigger, panel) {
-  function dismiss(restoreFocus = false) {
-    if (panel.hidden) return;
-    panel.hidden = true;
-    trigger.setAttribute('aria-expanded', 'false');
-    if (restoreFocus) trigger.focus({ preventScroll: true });
-  }
-  trigger.addEventListener('click', () => {
-    if (!panel.hidden) {
-      dismiss();
-      return;
-    }
-    panel.hidden = false;
-    trigger.setAttribute('aria-expanded', 'true');
-    panel.querySelector('input, select')?.focus({ preventScroll: true });
-  });
-  panel.addEventListener('keydown', event => {
-    if (event.key === 'Escape') dismiss(true);
-  });
-  document.addEventListener('pointerdown', event => {
-    if (!panel.contains(event.target) && !trigger.contains(event.target)) dismiss();
-  });
-  return dismiss;
-}
-
 const layerMenu = find('#layers-panel');
+const polityLegend = find('#polity-legend');
+for (const region of politicalRegions) {
+  const entry = html('li', 'polity-legend-row');
+  entry.dataset.polity = region.id;
+  entry.style.setProperty('--polity-color', region.color);
+  if (region.fillColor) entry.style.setProperty('--polity-fill', region.fillColor);
+  const swatch = html('span', 'polity-legend-swatch');
+  swatch.setAttribute('aria-hidden', 'true');
+  entry.append(swatch, region.name);
+  polityLegend.append(entry);
+}
+polityLegend.hidden = !layers.borders;
 connectPopover(find('#layers-toggle'), layerMenu);
 const closePlaybackSettings = connectPopover(find('#playback-settings-toggle'), find('#playback-settings'));
 layerMenu.addEventListener('change', event => {
   if (!(event.target instanceof HTMLInputElement)) return;
   const { layer } = event.target.dataset;
   layers[layer] = event.target.checked;
+  if (layer === 'borders') polityLegend.hidden = !layers.borders;
   if ((layer === 'administration' || layer === 'neighbors') && layers[layer] && camera.scale < .34) showPreset('route');
   queueDraw();
 });

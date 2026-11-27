@@ -1,10 +1,12 @@
-import { politicalRegions, administrations } from './historical-data.mjs';
-import { createProjector } from './globe.mjs?v=4';
+import { politicalRegions, administrations } from './historical-data.mjs?v=6';
+import { createProjector } from './globe.mjs?v=8';
+import { labelBox, labelFits } from './label-geometry.mjs';
 
 const NS = 'http://www.w3.org/2000/svg';
 const SCREEN_MARGIN = 8;
-const LABEL_ASCENT = 14;
+const LABEL_ASCENT = 15;
 const LABEL_DESCENT = 5;
+const LABEL_OFFSETS = [0, -22, 22, -42, 42];
 
 function element(name, className, text) {
   const node = document.createElementNS(NS, name);
@@ -59,10 +61,17 @@ function closeAroundGlobe(start, end, view) {
 
 function ringPaths(ring, view) {
   const points = ring.slice(0, -1).map(coords => ({ coords, point: view.locate(coords) }));
+  let left = Infinity;
+  let right = -Infinity;
+  for (const { point } of points) {
+    if (!point.visible) continue;
+    left = Math.min(left, point.x);
+    right = Math.max(right, point.x);
+  }
   const firstHidden = points.findIndex(({ point }) => !point.visible);
   if (firstHidden === -1) {
     const closed = pathThrough(points.map(({ point }) => point)) + 'Z';
-    return { outline: closed, fill: closed };
+    return { outline: closed, fill: closed, left, right };
   }
   let outline = '';
   let fill = '';
@@ -83,7 +92,7 @@ function ringPaths(ring, view) {
     }
     previous = next;
   }
-  return { outline, fill };
+  return { outline, fill, left, right };
 }
 
 function onScreen(point, view) {
@@ -95,42 +104,41 @@ function limit(value, min, max) {
 }
 
 function textWidth(node) {
-  // The SVG font rules do not change with zoom. Measure once and keep room for
-  // the text stroke and differences between the fallback and loaded typeface.
-  return Math.ceil(node.getComputedTextLength?.() || node.textContent.length * 8) + 8;
+  // Keep room for the halo when arranging labels beside one another.
+  return Math.ceil(node.getComputedTextLength?.() || node.textContent.length * 7.5) + 8;
 }
 
-function labelAt(x, y, width, anchor = 'middle') {
-  const offset = { start: 0, middle: width / 2, end: width }[anchor];
-  return { x, y, anchor, left: x - offset, right: x - offset + width, top: y - LABEL_ASCENT, bottom: y + LABEL_DESCENT };
+function labelAt(x, y, width, anchor) {
+  return labelBox(x, y, { width, above: LABEL_ASCENT, below: LABEL_DESCENT }, anchor);
 }
 
-function centeredLabel(point, width, view, offset = 0) {
-  const inset = SCREEN_MARGIN + width / 2;
-  if (view.width < inset * 2 || view.height < SCREEN_MARGIN * 2 + LABEL_ASCENT + LABEL_DESCENT) return null;
-  const x = limit(point.x, inset, view.width - inset);
-  const y = limit(point.y + offset, SCREEN_MARGIN + LABEL_ASCENT, view.height - SCREEN_MARGIN - LABEL_DESCENT);
+function labelBounds(view) {
+  return {
+    left: Math.max(SCREEN_MARGIN, view.labelBounds?.left ?? 0),
+    right: Math.min(view.width - SCREEN_MARGIN, view.labelBounds?.right ?? view.width),
+    top: Math.max(SCREEN_MARGIN, view.labelBounds?.top ?? 0),
+    bottom: Math.min(view.height - SCREEN_MARGIN, view.labelBounds?.bottom ?? view.height),
+  };
+}
+
+function centeredLabel(point, width, bounds, offset = 0, maxShift = 52) {
+  if (bounds.right - bounds.left < width || bounds.bottom - bounds.top < LABEL_ASCENT + LABEL_DESCENT) return null;
+  const x = limit(point.x, bounds.left + width / 2, bounds.right - width / 2);
+  const y = limit(point.y + offset, bounds.top + LABEL_ASCENT, bounds.bottom - LABEL_DESCENT);
+  if (Math.abs(x - point.x) > maxShift || Math.abs(y - point.y - offset) > maxShift) return null;
   return labelAt(x, y, width);
 }
 
-function labelFits(label, view, occupied) {
-  return label && label.left >= SCREEN_MARGIN && label.right <= view.width - SCREEN_MARGIN
-    && label.top >= SCREEN_MARGIN && label.bottom <= view.height - SCREEN_MARGIN
-    && !occupied.some(other => label.left < other.right && label.right > other.left
-      && label.top < other.bottom && label.bottom > other.top);
-}
-
-function labelBesideMarker(point, width, view, occupied) {
-  const y = limit(point.y + 3, SCREEN_MARGIN + LABEL_ASCENT, view.height - SCREEN_MARGIN - LABEL_DESCENT);
+function labelBesideMarker(point, width, bounds, occupied) {
+  const y = limit(point.y + 3, bounds.top + LABEL_ASCENT, bounds.bottom - LABEL_DESCENT);
+  if (Math.abs(point.y + 3 - y) > 18) return null;
   const right = labelAt(point.x + 8, y, width, 'start');
-  if (labelFits(right, view, occupied)) return right;
+  if (labelFits(right, bounds, occupied)) return right;
   const left = labelAt(point.x - 8, y, width, 'end');
-  if (labelFits(left, view, occupied)) return left;
-  const inset = SCREEN_MARGIN + width / 2;
-  const x = limit(point.x, inset, view.width - inset);
-  const above = labelAt(x, point.y - 9, width);
-  if (labelFits(above, view, occupied)) return above;
-  return labelAt(x, point.y + LABEL_ASCENT + 7, width);
+  if (labelFits(left, bounds, occupied)) return left;
+  const above = centeredLabel(point, width, bounds, -9, 24);
+  if (labelFits(above, bounds, occupied)) return above;
+  return centeredLabel(point, width, bounds, LABEL_ASCENT + 7, 24);
 }
 
 function showLabel(node, label, origin = { x: 0, y: 0 }) {
@@ -151,14 +159,30 @@ export function addHistoricalLayer(map) {
   const genericNames = new Map(Array.from(map.querySelectorAll('.map-label.land'), node => [node.textContent, node]));
 
   const shapes = politicalRegions.map(region => {
-    const outline = element('path', 'polity-outline');
+    const shape = element('g', 'polity-shape');
+    shape.dataset.polity = region.id;
+    const definition = element('defs');
+    const boundary = element('path', 'polity-boundary-geometry');
+    boundary.id = `${map.id || 'history'}-boundary-${region.id}`;
+    boundary.setAttribute('vector-effect', 'non-scaling-stroke');
+    definition.append(boundary);
+    const casing = element('use', 'polity-casing');
+    casing.setAttribute('href', `#${boundary.id}`);
+    const outline = element('use', 'polity-outline');
+    outline.setAttribute('href', `#${boundary.id}`);
     const fill = element('path', 'polity-fill');
-    outline.style.setProperty('--polity-color', region.color);
-    fill.style.setProperty('--polity-color', region.color);
-    territories.append(fill, outline);
-    const label = element('text', 'polity-name', region.name);
+    shape.style.setProperty('--polity-color', region.color);
+    shape.style.setProperty('--polity-fill', region.fillColor ?? region.color);
+    shape.style.setProperty('--polity-fill-opacity', region.fillOpacity ?? .32);
+    shape.style.setProperty('--polity-world-opacity', region.worldFillOpacity ?? .38);
+    shape.append(definition, fill, casing, outline);
+    territories.append(shape);
+
+    const label = element('text', 'polity-name', region.shortLabel ?? region.name);
+    label.dataset.polity = region.id;
+    label.style.setProperty('--polity-fill', region.fillColor ?? region.color);
     territoryNames.append(label);
-    return { outline, fill, label, coords: region.coords, rings: region.rings.map(sampleRing) };
+    return { boundary, fill, label, coords: region.coords, rings: region.rings.map(sampleRing), major: region.id === 'achaemenid-empire' };
   });
 
   const anchors = administrations.map(administration => {
@@ -188,51 +212,77 @@ export function addHistoricalLayer(map) {
 
   holder.append(territories, territoryNames, seats, neighbors);
   map.append(holder);
-  for (const feature of [...shapes, ...anchors]) feature.width = textWidth(feature.label);
+  const features = [...shapes, ...anchors];
+  let measuredWidth;
+  let lastProjection;
 
-  return function drawHistoricalLayer(view, layers, routePoint) {
+  function refreshMetrics() {
+    for (const feature of features) feature.width = textWidth(feature.label);
+    measuredWidth = map.clientWidth;
+  }
+
+  function drawHistoricalLayer(view, layers, routePoint) {
     if (!view.locate) view = { ...view, locate: createProjector(view) };
     const bordersVisible = layers.borders;
-    const namesVisible = bordersVisible && view.scale > .58;
+    const namesVisible = bordersVisible && layers.places !== false;
     const seatsVisible = layers.administration && view.scale > .33;
     const neighborsVisible = layers.neighbors && view.scale > .33;
     territories.style.display = bordersVisible ? '' : 'none';
     territoryNames.style.display = namesVisible ? '' : 'none';
     seats.style.display = seatsVisible ? '' : 'none';
     neighbors.style.display = neighborsVisible ? '' : 'none';
+    holder.classList.toggle('is-overview', view.scale < .35);
+    if (view.width !== measuredWidth) refreshMetrics();
+
+    const bounds = labelBounds(view);
     const occupied = routePoint && onScreen(routePoint, view) ? [{
-      left: routePoint.x - 45, right: routePoint.x + 45, top: routePoint.y - 28, bottom: routePoint.y + 16,
-    }] : [];
+      left: routePoint.x - 48, right: routePoint.x + 48, top: routePoint.y - 28, bottom: routePoint.y + 24,
+    }, ...(routePoint.labelBox ? [routePoint.labelBox] : [])] : [];
 
     if (bordersVisible) {
+      const projection = [view.lon, view.lat, view.radius, view.x, view.y].join(',');
       for (const shape of shapes) {
-        const paths = shape.rings.map(ring => ringPaths(ring, view));
-        shape.fill.setAttribute('d', paths.map(path => path.fill).join(''));
-        shape.fill.setAttribute('opacity', view.scale < .35 ? '.17' : '.11');
-        shape.outline.setAttribute('d', paths.map(path => path.outline).join(''));
+        if (lastProjection !== projection) {
+          shape.paths = shape.rings.map(ring => ringPaths(ring, view));
+          shape.fill.setAttribute('d', shape.paths.map(path => path.fill).join(''));
+          shape.boundary.setAttribute('d', shape.paths.map(path => path.outline).join(''));
+        }
         if (namesVisible) {
           const point = view.locate(shape.coords);
-          const candidate = onScreen(point, view) && centeredLabel(point, shape.width, view);
-          const label = labelFits(candidate, view, occupied) ? candidate : null;
+          const labelAllowed = point.visible && point.depth > .16 && (shape.major || view.scale > .43)
+            && shape.paths.some(({ left, right }) => Math.min(right, bounds.right) - Math.max(left, bounds.left) > shape.width * .55);
+          let label = null;
+          if (labelAllowed) {
+            for (const offset of LABEL_OFFSETS) {
+              const candidate = centeredLabel(point, shape.width, bounds, offset, shape.major ? 72 : 36);
+              if (labelFits(candidate, bounds, occupied)) {
+                label = candidate;
+                break;
+              }
+            }
+          }
           showLabel(shape.label, label);
           if (label) occupied.push(label);
         }
       }
+      lastProjection = projection;
     }
 
     for (const { group, label, coords, width, isNeighbor, hasMarker, duplicate } of anchors) {
       let placement = null;
       if (isNeighbor ? neighborsVisible : seatsVisible) {
         const point = view.locate(coords);
-        const shown = onScreen(point, view);
+        const shown = onScreen(point, view) && (layers.places !== false || hasMarker);
         group.setAttribute('display', shown ? 'inline' : 'none');
         if (shown) {
           group.setAttribute('transform', `translate(${round(point.x)} ${round(point.y)})`);
-          const candidate = hasMarker
-            ? labelBesideMarker(point, width, view, occupied) : centeredLabel(point, width, view, 3);
-          if (labelFits(candidate, view, occupied)) {
-            placement = candidate;
-            occupied.push(placement);
+          if (layers.places !== false) {
+            const candidate = hasMarker
+              ? labelBesideMarker(point, width, bounds, occupied) : centeredLabel(point, width, bounds, 3, 24);
+            if (labelFits(candidate, bounds, occupied)) {
+              placement = candidate;
+              occupied.push(placement);
+            }
           }
           showLabel(label, placement, point);
         }
@@ -240,5 +290,10 @@ export function addHistoricalLayer(map) {
       // A visible administrative label takes the place of its general map name.
       if (duplicate) duplicate.style.display = placement ? 'none' : '';
     }
-  };
+    return occupied;
+  }
+
+  refreshMetrics();
+  drawHistoricalLayer.refreshMetrics = refreshMetrics;
+  return drawHistoricalLayer;
 }

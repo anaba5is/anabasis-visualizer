@@ -1,45 +1,57 @@
 # Anabasis Visualizer
 
-A full-viewport globe and illustrated timeline of Xenophon’s *Anabasis*. Fifteen scenes follow all seven books, from Cyrus the Younger’s muster at Sardis to the handover of the surviving Greek mercenaries at Pergamum.
+[Open the atlas](https://anaba5is.github.io/anabasis-visualizer/) to follow Xenophon’s *Anabasis* from Sardis to Pergamum. Fifteen illustrated stops cover all seven books on a rotatable globe.
 
-[Open the GitHub Pages site](https://anaba5is.github.io/anabasis-visualizer/)
+## Explore
 
-## Explore the expedition
-
-- The site opens on the whole Earth. **Begin the journey** on desktop and **Route** on any screen zoom to the expedition. Drag or use the arrow keys to rotate, use the wheel or zoom buttons to move in and out, or pinch on a touch screen. **Scene** toggles the desktop field notes. Phones keep the current scene and scrubber in one compact dock. Open **Stops** for the book rail and playback settings. The fullscreen control expands the globe beyond the browser chrome where supported.
-- Select a route phase, map pin, book-band stop, or the journey scrubber to see the corresponding scene. Use **Previous**, **Next stop**, or **Play** to travel in order. Playback traces each incoming leg, and its settings offer speed and camera-follow controls. Each selected stop has a shareable URL.
-- Open **Layers** to toggle the expedition, terrain relief, approximate political outlines, satrapies and seats, nearby peoples and cities, place names, or the geographic grid.
-- With the map focused, use the arrow keys to rotate the globe. With a timeline stop focused, use the left and right arrows to step between stops, or Home and End to jump to the first or last scene.
-- Open a scene from the desktop card or phone dock for the full image and story. Use the previous and next scene buttons in the reader to move through the account. **Passages & image credit** lists Xenophon’s passages, location certainty, and the illustration’s source.
+- **Begin the journey** or **Route** takes you from the globe overview to the expedition. Drag to rotate, scroll or pinch to zoom, and use **Globe** to return to the overview.
+- Choose a pin, a phase, or a timeline stop. On phones, **Stops** expands the timeline. **Play** traces each incoming leg. The playback menu controls speed and camera following.
+- **Layers** toggles terrain, the expedition, approximate political borders, administrative centers, neighboring peoples and cities, labels, and the grid.
+- Open the selected scene for illustrations, text, and citations. Scene links use `#stop=<id>`.
+- With the globe focused, the arrow keys rotate it. With a timeline stop focused, the left and right arrows step through stops, and Home and End jump to the endpoints.
 
 ## Run locally
 
-Run the following command from the repository root.
+From the repository root:
 
 ```sh
-python3 -m http.server 8041
+python3 -m http.server 8041 --bind 127.0.0.1
 ```
 
-Open [the local site](http://localhost:8041/). The static site runs without a build step or API key.
+Open [the local atlas](http://127.0.0.1:8041/). The site uses native JavaScript modules and self-hosted assets. It needs no build step or API key.
 
-## GitHub Pages
+The loopback preview adds a **Type** menu for comparing the production fonts with Old Standard TT / Sofia Sans and the original Instrument Serif / system pairing. Direct comparison links accept `?type=greek`, `?type=scholar`, or `?type=current`.
 
-In the repository’s Pages settings, choose **Deploy from a branch**, select `main` and `/(root)`, and save. GitHub serves the static files from that branch. [Pages settings](https://github.com/anaba5is/anabasis-visualizer/settings/pages) · [GitHub Pages documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)
+## Code and checks
 
-## Sources and cartography
+| Area | Where to start |
+| --- | --- |
+| App, camera, and scene navigation | [atlas.mjs](atlas.mjs) |
+| Globe projection and WebGL / Canvas rendering | [globe.mjs](globe.mjs) |
+| Stop and place labels | [map-labels.mjs](map-labels.mjs), [label-geometry.mjs](label-geometry.mjs) |
+| Political borders and administrative labels | [historical-layer.mjs](historical-layer.mjs), [historical-data.mjs](historical-data.mjs) |
+| Timeline and playback | [timeline.mjs](timeline.mjs), [playback.mjs](playback.mjs) |
+| Narrative, citations, and artwork | [story.mjs](story.mjs), [scenes.mjs](scenes.mjs) |
+| Production typography | [typography.css](typography.css), [font licenses](assets/fonts) |
 
-The route connects selected places in Xenophon’s narrative order. Lines are reconstructions, dashed legs are especially uncertain, and some pins mark broad regions or disputed sites. The physical basemap depicts modern geography. Scene imagery includes later artwork and modern views, with credits and licenses recorded in [scenes.mjs](scenes.mjs).
+```sh
+node --test tests/*.test.mjs
+```
 
-The map and scene controls draw on Ostellus Atlas, Chronas, Ancient Earth, earth.nullschool.net and the Guardian’s *Bussed Out*. [Design references](design-references.md)
+The tests cover label geometry and collisions near screen edges and route pins. For a browser check, open an illustrated stop, toggle political borders in **Layers**, switch between **Route** and **Globe**, and try the mobile dock and scene reader.
 
-The research notes document earlier Anabasis map projects, editions of the primary text, and scholarship on uncertain locations. [Research notes](research.md)
+## Publish
 
-The high-detail terrain and shoreline use Natural Earth 1:10m data within 20°–52°E and 25°–47°N. The globe uses the coarser 1:50m layer elsewhere. [Historical borders and administrative sources](historical-sources.md) · [Natural Earth shaded relief](https://www.naturalearthdata.com/downloads/10m-raster-data/10m-shaded-relief/)
+GitHub Pages deploys `main` from the repository root. After pushing, check the Pages build and open the published atlas. Query versions on static stylesheets and modules help clients fetch changed assets during a rollout. [Pages settings](https://github.com/anaba5is/anabasis-visualizer/settings/pages)
 
-To regenerate the regional rivers, install [uv](https://docs.astral.sh/uv/) and run `uv run scripts/build-map.py`. The script downloads the public-domain Natural Earth river vectors and writes `assets/map-geometry.mjs`. [Natural Earth terms of use](https://www.naturalearthdata.com/about/terms-of-use/)
+## Historical sources and assets
 
-Run `uv run scripts/build-globe-detail.py` to generate the higher-resolution regional texture using Natural Earth 1:10m terrain and coastline data.
+The route is a reconstruction of selected stops in Xenophon’s narrative. Dashed legs and borders indicate uncertainty. The physical terrain is modern, and the historical fills represent approximate territorial extents around 401 BCE. Artwork includes later interpretations and modern views. [Historical sources](historical-sources.md) · [Research notes](research.md) · [Design references](design-references.md)
 
-Run `node scripts/build-scene-previews.mjs` with the WebP tools `cwebp` and `dwebp` available to regenerate the phone thumbnails and desktop card previews from the full scene images.
+| Generated asset | Command |
+| --- | --- |
+| Regional rivers | `uv run scripts/build-map.py` |
+| Regional terrain and shoreline | `uv run scripts/build-globe-detail.py` |
+| Scene cards and thumbnails | `node scripts/build-scene-previews.mjs` with `cwebp` and `dwebp` installed |
 
-[Design, code, performance, and narrative review](audit.md)
+The globe uses Natural Earth 1:50m data worldwide and a 1:10m high-detail overlay between 20°–52°E and 25°–47°N. [Natural Earth data](https://www.naturalearthdata.com/downloads/10m-raster-data/10m-shaded-relief/) · [Atlas audit](audit.md)

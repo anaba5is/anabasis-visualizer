@@ -7,15 +7,20 @@
   <meta name="theme-color" content="#142422">
   <title>Anabasis Visualizer</title>
   <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
-  <link rel="preload" href="./assets/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./assets/fonts/gfs-didot-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="./assets/globe-relief.webp" as="image" fetchpriority="high">
-  <link rel="stylesheet" href="./styles.css?v=3">
+  <link rel="stylesheet" href="./styles.css?v=8">
   <link rel="stylesheet" href="./timeline.css?v=4">
   <link rel="stylesheet" href="./fullscreen.css?v=2">
   <link rel="stylesheet" href="./glass.css?v=3">
-  <link rel="stylesheet" href="./experience.css">
+  <link rel="stylesheet" href="./experience.css?v=6">
   <link rel="stylesheet" href="./mobile.css">
-  <script type="module" src="./atlas.mjs?v=4"></script>
+  <link rel="stylesheet" href="./historical-map.css?v=6">
+  <link rel="stylesheet" href="./typography.css?v=8">
+  <script type="module" src="./atlas.mjs?v=8"></script>
+  <script type="module">
+    if (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) import('./type-preview.mjs?v=8');
+  </script>
 </head>
 <body>
   <a class="skip-link" href="#timeline">Skip to the timeline</a>
@@ -77,7 +82,8 @@
           <label><input type="checkbox" data-layer="neighbors"> Nearby peoples and cities</label>
           <label><input type="checkbox" data-layer="places" checked> Place names</label>
           <label><input type="checkbox" data-layer="grid" checked> Latitude and longitude</label>
-          <p>Territories around 401 BCE are approximate. Administrative markers indicate locations.</p>
+          <p>Dashed borders show approximate extents around 401 BCE.</p>
+          <ul class="polity-legend" id="polity-legend" aria-label="Historical territories"></ul>
           <div class="compact-map" aria-label="Route symbols">
             <span><i class="key-stop" aria-hidden="true"></i> Identified stop</span>
             <span><i class="key-estimate" aria-hidden="true"></i> Approximate or disputed</span>

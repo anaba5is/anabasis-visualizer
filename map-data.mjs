@@ -1,19 +1,31 @@
 export { rivers } from './assets/map-geometry.mjs?v=2';
 
+// Higher-priority labels take precedence at a shared screen position. Regional
+// anchors are representative points. Optional offsets position text in screen pixels.
 export const mapLabels = [
-  { name: 'Aegean Sea', kind: 'sea', coords: [26.25, 37.31] },
-  { name: 'Mediterranean Sea', kind: 'sea', coords: [30.8, 33.95] },
-  { name: 'Black Sea', kind: 'sea', coords: [36.35, 42.78] },
-  { name: 'Thrace', kind: 'land', coords: [26.9, 42.49] },
-  { name: 'Lydia', kind: 'land', coords: [28.95, 39.52] },
-  { name: 'Bithynia', kind: 'land', coords: [31.03, 40.38] },
-  { name: 'Phrygia', kind: 'land', coords: [31.6, 38.77] },
-  { name: 'Cappadocia', kind: 'land', coords: [34.94, 39.04] },
-  { name: 'Cilicia', kind: 'land', coords: [35.6, 37.55] },
-  { name: 'Armenia', kind: 'land', coords: [43.55, 40.42] },
-  { name: 'Syria', kind: 'land', coords: [37.47, 34.1] },
-  { name: 'Mesopotamia', kind: 'land', coords: [41.48, 35.3] },
-  { name: 'Babylonia', kind: 'land', coords: [44.7, 32.55] },
+  { name: 'Black Sea', kind: 'sea', coords: [36.35, 43.05], priority: 100, minScale: .34 },
+  { name: 'Mediterranean Sea', kind: 'sea', coords: [30.8, 33.95], priority: 95, minScale: .34 },
+  { name: 'Aegean Sea', kind: 'sea', coords: [26.25, 37.31], priority: 87, minScale: .48 },
+  { name: 'Armenia', kind: 'land', coords: [43.55, 40.42], priority: 83, minScale: .57 },
+  { name: 'Mesopotamia', kind: 'land', coords: [41.48, 35.30], priority: 81, minScale: .59 },
+  { name: 'Thrace', kind: 'land', coords: [26.9, 42.49], priority: 78, minScale: .62 },
+  { name: 'Babylonia', kind: 'land', coords: [44.7, 32.55], priority: 76, minScale: .64 },
+  { name: 'Syria', kind: 'land', coords: [37.47, 34.10], priority: 74, minScale: .64 },
+  { name: 'Cilicia', kind: 'land', coords: [35.6, 37.55], priority: 72, minScale: .69 },
+  { name: 'Lydia', kind: 'land', coords: [28.73, 38.62], priority: 70, minScale: .72 },
+  { name: 'Phrygia', kind: 'land', coords: [31.6, 38.77], priority: 68, minScale: .73 },
+  { name: 'Cappadocia', kind: 'land', coords: [34.94, 39.04], priority: 65, minScale: .76 },
+  { name: 'Bithynia', kind: 'land', coords: [31.03, 40.38], priority: 63, minScale: .78 },
+  { name: 'Colchis', kind: 'land', coords: [42.63, 42.18], priority: 61, minScale: .84 },
+  { name: 'Paphlagonia', kind: 'land', coords: [33.53, 41.05], priority: 59, minScale: .86 },
+  { name: 'Mysia', kind: 'land', coords: [27.73, 39.61], priority: 57, minScale: .95 },
+  { name: 'Euphrates', kind: 'river', coords: [41.5274, 34.4239], priority: 75, minScale: .74, offset: [-5, 12] },
+  { name: 'Tigris', kind: 'river', coords: [43.7698, 34.5297], priority: 75, minScale: .74, offset: [6, -7] },
+  { name: 'Sea of Marmara', kind: 'sea', coords: [28.06, 40.72], priority: 49, minScale: 1.18 },
+  { name: 'Bosporus', kind: 'sea', coords: [29.074, 41.12], priority: 51, minScale: 1.27, offset: [4, -11] },
+  { name: 'Hellespont', kind: 'sea', coords: [26.4, 40.158], priority: 50, minScale: 1.27, offset: [-7, 11] },
+  { name: 'Maeander', kind: 'river', coords: [28.8313, 37.9595], priority: 46, minScale: 1.31, offset: [3, 11] },
+  { name: 'Pyramus', kind: 'river', coords: [35.7952, 37.055], priority: 45, minScale: 1.31, offset: [5, 11] },
 ];
 
 // Intermediate points keyed by the next story stop. They show the broad direction
@@ -60,7 +72,7 @@ export const routeWaypoints = {
     [43.72, 35.21],
     [43.58, 35.59],
   ],
-  mespila: [[43.33, 36.10]], // Larissa, usually identified with Nimrud
+  mespila: [[43.33, 36.10]], // Larisa, usually identified with Nimrud
   'carduchian-mountains': [
     [42.98, 36.59],
     [42.82, 36.97],
@@ -83,7 +95,7 @@ export const routeWaypoints = {
   cotyora: [
     [39.23, 41.02],
     [38.81, 40.93],
-    [38.38, 40.88], // Kerasus vicinity
+    [38.38, 40.88], // Cerasus vicinity
     [38.02, 40.92],
   ],
   calpe: [
@@ -144,6 +156,21 @@ export const mapReferences = [
     name: 'Natural Earth',
     note: 'Public-domain coastline, inland water and terrain. The physical basemap uses modern geography.',
     url: 'https://www.naturalearthdata.com/about/terms-of-use/',
+  },
+  {
+    name: 'The Archaeological Exploration of Sardis',
+    note: 'Crawford H. Greenewalt Jr. on the Hermus valley and the geography of Lydia and neighboring Mysia.',
+    url: 'https://www.sardisexpedition.org/en/essays/latw-greenewalt-introduction',
+  },
+  {
+    name: 'Colchis',
+    note: 'Encyclopaedia Iranica on the historical region at the eastern end of the Black Sea.',
+    url: 'https://www.iranicaonline.org/articles/colchis/',
+  },
+  {
+    name: 'Strabo, Geography 12.3',
+    note: 'A later ancient description of Paphlagonia, Mount Olgassys and the southern Black Sea coast.',
+    url: 'https://penelope.uchicago.edu/Thayer/e/roman/texts/strabo/12c%2A.html',
   },
   {
     name: 'C. J. Tuplin, The Anabasis in Atlas of Classical History',

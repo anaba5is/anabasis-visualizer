@@ -197,3 +197,35 @@
   .story-panel .scene img { aspect-ratio: 2.15; }
   .story-panel .story-copy { padding-block: .72rem 2.85rem; }
 }
+
+.polity-legend {
+  display: grid;
+  gap: .35rem;
+  margin: .65rem 0 0;
+  padding: 0;
+  list-style: none;
+  color: #f6e8ce;
+  font-size: .76rem;
+}
+.polity-legend-row { display: flex; align-items: center; gap: .5rem; }
+.polity-legend-swatch {
+  width: .86rem;
+  height: .62rem;
+  border: 1px dashed var(--polity-border, var(--polity-color));
+  border-radius: .14rem;
+  background: var(--polity-ink, var(--polity-fill, var(--polity-color)));
+}
+
+.map-label.sea { fill: #e9e9d5; stroke: #17404a; font-size: clamp(17px, 1.7vw, 25px); }
+.map-label.river { fill: #103d49; stroke: #d4c6a6; }
+.map-label.strait { fill: #ecedda; stroke: #16363c; font: 600 11px var(--body); letter-spacing: .06em; }
+.map-label.region, .map-label.land { fill: #2a3836; stroke: #dcc9a5; font-size: 10px; letter-spacing: .12em; }
+.map-label.river-group { fill: #193e49; stroke: #dbc9a7; font: 600 11px var(--body); }
+.map-stop-label.selected { stroke: #18292b; }
+.map-stop-label { fill: #fff4d9; }
+
+@media (max-width: 43rem) {
+  .map-label.land, .map-label.river { display: initial; }
+  .map-label.sea { letter-spacing: .65px; }
+  .map-label.river { font-size: 11px; }
+}
