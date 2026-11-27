@@ -1,6 +1,7 @@
 import { journeyChapters, stops } from './story.mjs';
 import { scenes } from './scenes.mjs';
 import { html, link } from './dom.mjs';
+import { expeditionContext, sceneContext } from './scene-context.mjs';
 
 export function bookFor(stop) {
   return ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][Number(stop.book[0]) - 1];
@@ -28,6 +29,7 @@ function passageNotes(stop, scene) {
   const credit = html('p', 'image-credit', 'Image ');
   credit.append(link(scene.credit, scene.source));
   if (scene.licenseUrl) credit.append(' · ', link(scene.licenseName, scene.licenseUrl));
+  if (scene.objectSource) credit.append(' · ', link('Museum catalogue', scene.objectSource));
   if (stop.locationSource) links.append(link('Location study', stop.locationSource));
   notes.append(
     html('summary', '', 'Passages & image credit'),
@@ -39,38 +41,61 @@ function passageNotes(stop, scene) {
   return notes;
 }
 
-export function createSceneReader(dialog, { index, select, pause, fallbackFocus }) {
+function contextNote({ title, text, source, sourceLabel }) {
+  const note = html('section', 'reader-context');
+  note.append(html('h3', '', title), html('p', '', text), link(sourceLabel, source));
+  return note;
+}
+
+export function createSceneReader(dialog, { index, select, pause, fallbackFocus, onLayout }) {
   const readerImage = dialog.querySelector('img');
   const readerCaption = dialog.querySelector('figcaption');
   const readerRegion = dialog.querySelector('#scene-viewer-region');
   const readerTitle = dialog.querySelector('h2');
+  const readerLead = dialog.querySelector('#scene-viewer-lead');
   const readerCopy = dialog.querySelector('#scene-viewer-copy');
   const readerPrevious = dialog.querySelector('#reader-previous');
   const readerNext = dialog.querySelector('#reader-next');
+  const desktop = matchMedia('(min-width: 52.01rem) and (min-height: 30.01rem), (min-width: 70.01rem)');
   let opener;
+  let restoreOnClose = true;
+  let renderedIndex;
   readerTitle.tabIndex = -1;
 
   function render(i) {
+    if (i === renderedIndex) return;
+    renderedIndex = i;
     const stop = stops[i];
     const scene = scenes[stop.id];
     readerRegion.textContent = placeAndBook(stop) + ' · ' + formatStopDate(stop);
     readerTitle.textContent = stop.name;
     readerImage.src = `./assets/${scene.file}`;
+    readerImage.classList.toggle('contain', Boolean(scene.contain));
     readerImage.alt = scene.alt;
-    readerCaption.textContent = scene.caption;
+    const objectMetadata = [scene.imageKind, scene.objectDate].filter(Boolean);
+    const caption = html('span', '', scene.caption);
+    if (objectMetadata.length) {
+      readerCaption.replaceChildren(html('span', 'image-kind', objectMetadata.join(' · ')), caption);
+    } else {
+      readerCaption.replaceChildren(caption);
+    }
+    readerLead.replaceChildren(html('h3', '', stop.title), html('p', '', stop.summary));
     const content = document.createDocumentFragment();
     const chapter = journeyChapters[stop.phase];
-    if (chapter && stops[i - 1]?.phase !== stop.phase) {
-      const opening = html('section', 'reader-context');
-      opening.append(
-        html('h3', '', chapter.title),
-        html('p', '', chapter.synopsis),
-        link(`Read Xenophon ${chapter.book}`, chapter.source),
-      );
-      content.append(opening);
+    if (stop.id === 'sardis') {
+      content.append(contextNote(expeditionContext));
+    } else if (chapter && stops[i - 1]?.phase !== stop.phase) {
+      content.append(contextNote({
+        title: chapter.title,
+        text: chapter.synopsis,
+        source: chapter.source,
+        sourceLabel: `Read Xenophon ${chapter.book}`,
+      }));
     }
-    content.append(html('h3', '', stop.title), html('p', '', stop.summary), html('p', '', stop.detail));
+    content.append(html('p', '', stop.detail));
     if (stop.whyItMatters) content.append(html('p', 'reader-takeaway', stop.whyItMatters));
+    const context = sceneContext[stop.id];
+    if (context) content.append(contextNote(context));
     content.append(passageNotes(stop, scene));
     readerCopy.replaceChildren(content);
     readerPrevious.disabled = i === 0;
@@ -78,33 +103,73 @@ export function createSceneReader(dialog, { index, select, pause, fallbackFocus 
     dialog.scrollTop = 0;
   }
 
+  function isSideOpen() {
+    return dialog.open && dialog.dataset.presentation === 'side';
+  }
+
+  function show() {
+    dialog.dataset.presentation = desktop.matches ? 'side' : 'sheet';
+    if (desktop.matches) dialog.show();
+    else dialog.showModal();
+    onLayout(isSideOpen());
+  }
+
+  function close(restoreFocus = true) {
+    if (!dialog.open) return;
+    restoreOnClose = restoreFocus;
+    dialog.close();
+  }
+
   function step(delta) {
     const next = index() + delta;
     if (!stops[next]) return;
     select(next);
-    render(next);
     readerTitle.focus({ preventScroll: true });
   }
 
   readerPrevious.addEventListener('click', () => step(-1));
   readerNext.addEventListener('click', () => step(1));
   dialog.addEventListener('close', () => {
-    const target = opener?.isConnected && opener.getClientRects().length ? opener : fallbackFocus();
-    target.focus({ preventScroll: true });
+    if (dialog.open) return;
+    onLayout(false);
+    if (restoreOnClose) {
+      const target = opener?.isConnected && opener.getClientRects().length ? opener : fallbackFocus();
+      target.focus({ preventScroll: true });
+    }
+    restoreOnClose = true;
   });
   dialog.addEventListener('click', event => {
-    if (event.target !== dialog) return;
+    if (isSideOpen() || event.target !== dialog) return;
     const box = dialog.getBoundingClientRect();
     if (event.clientX < box.left || event.clientX > box.right
-      || event.clientY < box.top || event.clientY > box.bottom) dialog.close();
+      || event.clientY < box.top || event.clientY > box.bottom) close();
+  });
+  dialog.addEventListener('keydown', event => {
+    if (!event.defaultPrevented && event.key === 'Escape' && isSideOpen()) {
+      event.preventDefault();
+      close();
+    }
+  });
+  desktop.addEventListener('change', () => {
+    if (!dialog.open) return;
+    dialog.close();
+    show();
   });
 
   return {
     open(trigger) {
       pause();
       opener = trigger;
+      restoreOnClose = true;
       render(index());
-      dialog.showModal();
+      if (!dialog.open) show();
+      dialog.scrollTop = 0;
+      readerTitle.focus({ preventScroll: true });
     },
+    update(i) {
+      if (dialog.open) render(i);
+    },
+    isSideOpen,
+    close,
   };
 }

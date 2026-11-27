@@ -134,3 +134,8 @@
 @media (max-width: 32rem) {
   .world-focus-card { left: var(--atlas-left); width: auto; }
 }
+
+.story-map .historical-layer .polity-fill { fill-opacity: .16; }
+.story-map .historical-layer :is(.polity-outline, .polity-casing) { opacity: .54; }
+.story-map .historical-layer .world-map-sites { opacity: .24; }
+.story-map .historical-layer .world-map-sites .administration-name { display: none; }

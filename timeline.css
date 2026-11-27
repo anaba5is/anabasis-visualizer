@@ -189,3 +189,7 @@
   outline-offset: 1px;
   border-radius: .2rem;
 }
+
+@media (min-width: 52.01rem) and (max-width: 70rem) and (min-height: 30.01rem) {
+  .route-timeline__name { font-size: clamp(.55rem, .96vw, .66rem); }
+}

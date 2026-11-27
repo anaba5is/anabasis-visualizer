@@ -7,7 +7,7 @@
 - **Begin the journey** or **Route** takes you from the globe overview to the expedition. Drag to rotate, scroll or pinch to zoom, and use **Globe** to return to the overview.
 - Choose a pin, a phase, or a timeline stop. On phones, **Stops** expands the timeline. **Play** traces each incoming leg. The playback menu controls speed and camera following.
 - **Layers** toggles terrain, the expedition, approximate political borders, and several kinds of labels and sites. **World view** rotates to a region. **Browse states and sites** opens the historical index with notes, sources, and globe links.
-- Open the selected scene for illustrations, text, and citations. Scene links use `#stop=<id>`. A selected region or place gets its own information card and shareable `#world=<id>` or `#place=<id>` link.
+- Open the selected scene for illustrations, backstory, and citations. On desktop the reader sits beside the interactive globe and timeline. On phones it opens as a sheet. Scene links use `#stop=<id>`. A selected region or place gets its own information card and shareable `#world=<id>` or `#place=<id>` link.
 - With the globe focused, the arrow keys rotate it. With a timeline stop focused, the left and right arrows step through stops, and Home and End jump to the endpoints.
 
 ## Run locally
@@ -33,7 +33,7 @@ Open [the local atlas](http://127.0.0.1:8041/). The site uses native JavaScript 
 | Political borders and administrative labels | [historical-layer.mjs](historical-layer.mjs), [historical-data.mjs](historical-data.mjs) |
 | World polities and archaeological context | [world-history.mjs](world-history.mjs), [world-sites.mjs](world-sites.mjs), [world-context-asia.mjs](world-context-asia.mjs), [world-context-west.mjs](world-context-west.mjs) |
 | Timeline and playback | [timeline.mjs](timeline.mjs), [playback.mjs](playback.mjs) |
-| Narrative, citations, and artwork | [story.mjs](story.mjs), [scenes.mjs](scenes.mjs) |
+| Narrative, context, citations, and artwork | [story.mjs](story.mjs), [scene-context.mjs](scene-context.mjs), [scenes.mjs](scenes.mjs) |
 | Production typography | [typography.css](typography.css), [font licenses](assets/fonts) |
 
 ```sh
@@ -48,7 +48,7 @@ Use 1024 × 768 and 1440 × 900 for desktop, then 390 × 844 and 568 × 320 for 
 
 1. Start at the root URL. Confirm the introduction and globe appear. On phones the introduction lives in the dock.
 2. Choose **Begin the journey**. On desktop verify Book VII and Pergamum are already in view, then arrow through the stops and use End. On phones expand **Stops** and use the scrubber.
-3. At Pergamum make sure **Read scene** sits inside its card. Open it and check scene stepping and focus on close. At Theches open **Passages & image credit** and check the location study link.
+3. At Pergamum make sure **Read scene** sits inside its card. Open it and check that the reader docks on desktop, that timeline stops still update it, and that Close restores focus. On phones confirm a modal sheet. At Theches open **Passages & image credit** and check the location study link.
 4. In **Layers** rotate to East and Inner Asia. From the world index jump to Monte Albán. Reload its bookmark, check the world card and highlight, and use **Return to route**.
 5. With a phone-sized viewport and a fresh reload, check the network panel for `globe-relief-compact.webp`. Switch to Route to check that `map-geometry.mjs` loads. Check the console in both views.
 
@@ -60,7 +60,7 @@ GitHub Pages deploys `main` from the repository root. After pushing, check the P
 
 ## Historical sources and assets
 
-The route is a reconstruction of selected stops in Xenophon’s narrative. Dashed legs and borders indicate uncertainty. The physical terrain is modern, and the historical fills represent approximate territorial extents around 401 BCE. Artwork includes later interpretations and modern views. [Historical sources](historical-sources.md) · [Research notes](research.md) · [Design references](design-references.md)
+The route is a reconstruction of selected stops in Xenophon’s narrative. Dashed legs and borders indicate uncertainty. The physical terrain is modern, and the historical fills represent approximate territorial extents around 401 BCE. Scene artwork favors ancient objects and coins, including period analogues and objects made after the expedition. Captions identify the date, depictive scope, and source. A small number of later illustrations remain for otherwise hard-to-illustrate scenes. [Historical sources](historical-sources.md) · [Research notes](research.md) · [Design references](design-references.md)
 
 | Generated asset | Command |
 | --- | --- |

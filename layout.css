@@ -840,23 +840,6 @@ body > .site-footer { display: none; }
   color: #ecd5ad;
 }
 .story-panel .stop-summary { color: #eedfc9; }
-.card-chapter {
-  display: flex;
-  align-items: center;
-  gap: .48rem;
-  color: #ead7b6;
-  margin-bottom: .58rem;
-  font-size: .72rem;
-  font-weight: 650;
-}
-.card-chapter::before {
-  content: "";
-  display: inline-block;
-  width: .45rem;
-  height: .45rem;
-  border-radius: 50%;
-  background: var(--scene-phase, #eacb98);
-}
 .story-panel .scene-action-label {
   border-color: rgb(234 211 169 / .43);
   background: #2e4940;
@@ -1281,4 +1264,88 @@ body > .site-footer { display: none; }
   }
   .phone-intro span:first-child { font-weight: 700; font-size: .76rem; }
   .phone-intro span + span { font-size: .63rem; color: #ead7b6; line-height: 1.2; }
+}
+
+/* The scene text shares the map on wide screens and opens as a sheet on phones. */
+.atlas-window.scene-reading .story-panel { display: none; }
+
+.scene-viewer[data-presentation="side"] {
+  position: fixed;
+  z-index: 7;
+  inset: var(--atlas-story-top) var(--atlas-right) var(--atlas-above-dock) auto;
+  width: clamp(21rem, 34vw, 29rem);
+  max-width: none;
+  max-height: none;
+  height: auto;
+  margin: 0;
+  border-radius: .92rem;
+  overscroll-behavior: contain;
+  animation: none;
+}
+
+.scene-viewer[data-presentation="side"] > header {
+  align-items: start;
+  padding: .7rem .85rem;
+}
+
+.scene-viewer[data-presentation="side"] h2 {
+  font-size: clamp(1.45rem, 2.18vw, 2.45rem);
+  text-wrap: balance;
+}
+
+.scene-viewer[data-presentation="side"] .scene-reader-actions { gap: .22rem; }
+.scene-viewer[data-presentation="side"] .scene-reader-actions nav { gap: .18rem; }
+.scene-viewer[data-presentation="side"] .scene-reader-actions nav button { width: 2rem; }
+.scene-viewer[data-presentation="side"] .scene-reader-actions form button { padding-inline: .55rem; }
+
+.scene-viewer-lead {
+  padding: .8rem clamp(.9rem, 3vw, 1.45rem);
+}
+
+.scene-viewer-lead h3 {
+  margin: 0 0 .36rem;
+  color: var(--rust);
+  font: 400 clamp(1.15rem, 1.8vw, 1.8rem)/1.16 var(--display);
+}
+
+.scene-viewer-lead p { margin: 0; line-height: 1.45; }
+.scene-viewer[data-presentation="side"] figure img { max-height: min(28dvh, 16rem); }
+.scene-viewer figure img.contain { object-fit: contain; }
+.scene-viewer .image-kind {
+  display: block;
+  margin-bottom: .16rem;
+  color: #795640;
+  font-size: .71rem;
+  font-weight: 650;
+}
+
+.story-map .route-path:not(.traversed) { opacity: .30; }
+.story-map .route-shadow:has(+ .route-path:not(.traversed)) { opacity: .26; }
+
+.sea-moment {
+  position: fixed;
+  z-index: 2;
+  left: var(--atlas-left);
+  bottom: calc(var(--atlas-above-dock) + 10.1rem);
+  margin: 0;
+  padding: .35rem .6rem;
+  border-inline-start: 1px solid #e2c78f;
+  color: #fff1d1;
+  background: linear-gradient(90deg, #172c2ae8, #172c2a8c 78%, transparent);
+  pointer-events: none;
+}
+.sea-moment blockquote {
+  margin: 0;
+  font: 400 clamp(1.26rem, 2.75vw, 2.45rem)/1.2 var(--display);
+}
+.sea-moment figcaption {
+  margin-top: .15rem;
+  color: #f4dfb7;
+  font-size: .68rem;
+}
+@media (max-width: 52rem), (max-width: 70rem) and (max-height: 30rem) {
+  .sea-moment { bottom: calc(var(--phone-tools-floor) + 3.15rem); }
+}
+@media (max-height: 30rem) {
+  .sea-moment { display: none; }
 }

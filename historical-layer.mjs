@@ -261,7 +261,7 @@ export function addHistoricalLayer(map) {
     measuredWidth = map.clientWidth;
   }
 
-  function drawHistoricalLayer(view, layers, routePoint) {
+  function drawHistoricalLayer(view, layers, routePoint, stopLabels = []) {
     if (!view.locate) view = { ...view, locate: createProjector(view) };
     const bordersVisible = layers.borders;
     const namesVisible = bordersVisible && layers.places !== false;
@@ -277,9 +277,12 @@ export function addHistoricalLayer(map) {
     if (view.width !== measuredWidth) refreshMetrics();
 
     const bounds = labelBounds(view);
-    const occupied = routePoint && onScreen(routePoint, view) ? [{
-      left: routePoint.x - 48, right: routePoint.x + 48, top: routePoint.y - 28, bottom: routePoint.y + 24,
-    }, ...(routePoint.labelBox ? [routePoint.labelBox] : [])] : [];
+    const occupied = [...stopLabels];
+    if (routePoint && onScreen(routePoint, view)) {
+      occupied.push({
+        left: routePoint.x - 48, right: routePoint.x + 48, top: routePoint.y - 28, bottom: routePoint.y + 24,
+      });
+    }
 
     if (bordersVisible) {
       const projection = [view.lon, view.lat, view.radius, view.x, view.y].join(',');
@@ -323,7 +326,8 @@ export function addHistoricalLayer(map) {
         group.setAttribute('display', shown ? 'inline' : 'none');
         if (shown) {
           group.setAttribute('transform', `translate(${round(point.x)} ${round(point.y)})`);
-          const labelVisible = layers.places !== false && (!isWorldSite || overview || view.scale > .34 || id === view.focusId);
+          const labelVisible = layers.places !== false
+            && (!isWorldSite || (!view.storyMap && (overview || view.scale > .34 || id === view.focusId)));
           if (labelVisible) {
             const candidate = hasMarker
               ? labelBesideMarker(point, width, bounds, occupied) : centeredLabel(point, width, bounds, 3, 24);

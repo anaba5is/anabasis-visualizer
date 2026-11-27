@@ -1,4 +1,4 @@
-import { stops, journeyChapters } from './story.mjs';
+import { stops } from './story.mjs';
 import { captions } from './captions.mjs';
 
 import { scenes } from './scenes.mjs';
@@ -17,7 +17,7 @@ import { bookFor, placeAndBook, formatStopDate, createSceneReader } from './scen
 
 const phases = [
   { name: 'March inland', color: '#f1b66f', timelineColor: '#a4662a' },
-  { name: 'Retreat', color: '#f69c89', timelineColor: '#a95141' },
+  { name: 'Retreat', color: '#d4e3ec', timelineColor: '#657f91' },
   { name: 'Black Sea', color: '#92e4d6', timelineColor: '#2a796d' },
   { name: 'Aftermath', color: '#e6c6f2', timelineColor: '#755383' },
 ];
@@ -43,6 +43,7 @@ const mapFrame = find('.map-frame');
 const masthead = find('.masthead');
 const atlasWindow = find('.atlas-window');
 const intro = find('#journey-intro');
+const seaMoment = find('#sea-moment');
 const mapModes = find('.map-mode');
 const mapTools = find('.map-controls');
 const worldCard = find('#world-focus-card');
@@ -65,6 +66,7 @@ const viewGlobe = find('#view-globe');
 const sources = find('#sources');
 const sceneToggle = find('#scene-toggle');
 const storyPanel = find('#story-panel');
+const readerDialog = find('#image-viewer');
 const timelinePanel = find('.timeline-panel');
 const phaseControls = find('#phase-controls');
 const mapKey = find('.map-key');
@@ -338,20 +340,14 @@ function openScene(trigger) {
 function renderStory(stop, i) {
   const book = bookFor(stop);
   const scene = scenes[stop.id];
-  const chapter = journeyChapters[stop.phase];
   const title = html('h2', 'stop-name', stop.name);
   title.id = 'stop-title';
   const copy = html('div', 'story-copy');
   copy.append(
-    html('p', 'stop-region', placeAndBook(stop)),
+    html('p', 'stop-region', placeAndBook(stop) + ' · ' + formatStopDate(stop)),
     title,
-    html('p', 'stop-title', stop.title),
     html('p', 'stop-summary', captions[stop.id]),
   );
-  if (chapter) {
-    copy.prepend(html('div', 'card-chapter', chapter.title));
-    storyPanel.style.setProperty('--scene-phase', phaseByName.get(stop.phase).color);
-  }
   const expand = html('button', 'scene-action');
   expand.type = 'button';
   expand.setAttribute('aria-label', `Read scene for ${stop.name}`);
@@ -387,6 +383,7 @@ function selectStop(i, { updateHash = true, announce = true, move = true } = {})
   if (!stop) return;
   selectedIndex = i;
   renderStory(stop, i);
+  sceneReader.update(i);
   markerNodes.forEach((marker, index) => {
     const here = i === index;
     marker.classList.toggle('selected', here);
@@ -472,7 +469,7 @@ function measureCameraFrame() {
   const height = mapFrame.clientHeight;
   const padding = clamp(width * .029, 10, 38);
   const dock = layoutBox(timelinePanel);
-  const scene = layoutBox(storyPanel);
+  const scene = layoutBox(sceneReader.isSideOpen() ? readerDialog : storyPanel);
   const opening = layoutBox(intro);
   const sidebar = box => box && box.width < width * .57 && box.left - mapBox.left > width * .4;
   const top = Math.max(
@@ -538,6 +535,10 @@ function draw() {
   drawFrame = undefined;
   const view = getView();
   if (!view.width || !view.height) return;
+  const storyMap = !worldFocus && (mode === 'route' || sceneReader.isSideOpen() || (playback.isPlaying() && followControl.checked));
+  atlasWindow.classList.toggle('story-map', storyMap);
+  view.storyMap = storyMap;
+  seaMoment.hidden = !storyMap || stops[selectedIndex].id !== 'mount-theches';
   const projection = [view.width, view.height, view.x, view.y, view.lon, view.lat, view.radius, view.scale].join(',');
   const surfaceKey = `${projection}|${layers.terrain}|${window.devicePixelRatio}`;
   if (lastSurfaceView !== surfaceKey) {
@@ -545,7 +546,7 @@ function draw() {
     surface.draw({ ...view, terrain: layers.terrain });
   }
   viewAtLastDraw = view;
-  const overlayKey = `${projection}|${selectedIndex}|${worldFocus?.id ?? ''}|${Object.values(layers).join(',')}`;
+  const overlayKey = `${projection}|${selectedIndex}|${worldFocus?.id ?? ''}|${storyMap}|${Object.values(layers).join(',')}`;
   if (lastProjectedView === overlayKey) {
     drawTrail(view);
     return;
@@ -562,13 +563,13 @@ function draw() {
     const r = i === selectedIndex ? 12 : 7;
     return [{ left: point.x - r, right: point.x + r, top: point.y - r, bottom: point.y + r }];
   }) : [];
-  const { occupied: stopLabels, selectedBox } = labelRenderer.drawStops(view, positions, selectedIndex, layers, pinBounds);
-  const routeAnchor = layers.route ? { ...positions[selectedIndex], labelBox: selectedBox } : null;
-  const historicalLabels = drawHistoricalLayer(view, layers, routeAnchor) ?? [];
+  const { occupied: stopLabels } = labelRenderer.drawStops(view, positions, selectedIndex, layers, pinBounds);
+  const routeAnchor = layers.route ? positions[selectedIndex] : null;
+  const historicalLabels = drawHistoricalLayer(view, layers, routeAnchor, stopLabels);
   const focusedPlace = worldFocus?.kind ? view.locate(worldFocus.coords) : undefined;
   worldFocusMarker.setAttribute('visibility', focusedPlace?.visible ? 'visible' : 'hidden');
   if (focusedPlace?.visible) worldFocusMarker.setAttribute('transform', `translate(${focusedPlace.x} ${focusedPlace.y})`);
-  labelRenderer.drawPlaces(view, [...stopLabels, ...historicalLabels, ...pinBounds], layers.places);
+  labelRenderer.drawPlaces(view, [...historicalLabels, ...pinBounds], layers.places);
   for (const { node, points, regional } of gridNodes) {
     node.setAttribute('d', layers.grid && regional === (view.scale >= .52) ? linePath(points, view) : '');
   }
@@ -790,10 +791,14 @@ const playback = createPlayback({
     }
   },
 });
-const sceneReader = createSceneReader(find('#image-viewer'), {
+const sceneReader = createSceneReader(readerDialog, {
   index: () => selectedIndex,
   select: chooseStop,
   pause: () => setPlaying(false),
+  onLayout(sideOpen) {
+    atlasWindow.classList.toggle('scene-reading', sideOpen);
+    resizeMap();
+  },
   fallbackFocus() {
     const trigger = phoneScene.getClientRects().length ? phoneScene : find('.scene-action');
     return trigger?.getClientRects().length ? trigger : mapFrame;
@@ -885,6 +890,10 @@ reset.addEventListener('click', () => showPreset('route'));
 viewRoute.addEventListener('click', () => showPreset('route'));
 viewGlobe.addEventListener('click', () => showPreset('globe'));
 sceneToggle.addEventListener('click', () => {
+  if (sceneReader.isSideOpen()) {
+    sceneReader.close();
+    return;
+  }
   storyPanel.hidden = !storyPanel.hidden;
   sceneToggle.setAttribute('aria-expanded', String(!storyPanel.hidden));
   atlasWindow.classList.toggle('scene-hidden', storyPanel.hidden);
@@ -975,6 +984,7 @@ worldPanel = connectWorldPanel({
     heading.focus();
   },
   onFocus(entry, zoom) {
+    sceneReader.close(false);
     setPlaying(false);
     dismissIntro();
     setMode('free');
