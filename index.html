@@ -15,9 +15,9 @@
   <link rel="stylesheet" href="./glass.css?v=3">
   <link rel="stylesheet" href="./experience.css?v=6">
   <link rel="stylesheet" href="./mobile.css">
-  <link rel="stylesheet" href="./historical-map.css?v=6">
+  <link rel="stylesheet" href="./historical-map.css?v=9">
   <link rel="stylesheet" href="./typography.css?v=8">
-  <script type="module" src="./atlas.mjs?v=8"></script>
+  <script type="module" src="./atlas.mjs?v=10"></script>
   <script type="module">
     if (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) import('./type-preview.mjs?v=8');
   </script>
@@ -75,15 +75,22 @@
         </section>
         <aside class="glass-popover layer-menu" id="layers-panel" aria-labelledby="layers-heading" hidden>
           <h2 id="layers-heading">Map layers</h2>
+          <label class="world-view-label">World view
+            <select id="world-view">
+              <option value="">Rotate to a region</option>
+            </select>
+          </label>
+          <button type="button" class="world-index-button" id="open-world-index">Browse states and sites</button>
           <label><input type="checkbox" data-layer="route" checked> Expedition</label>
           <label><input type="checkbox" data-layer="terrain" checked> Terrain relief</label>
           <label><input type="checkbox" data-layer="borders" checked> Historical borders</label>
+          <label><input type="checkbox" data-layer="worldSites" checked> World sites and communities</label>
           <label><input type="checkbox" data-layer="administration"> Satrapies and seats</label>
           <label><input type="checkbox" data-layer="neighbors"> Nearby peoples and cities</label>
           <label><input type="checkbox" data-layer="places" checked> Place names</label>
           <label><input type="checkbox" data-layer="grid" checked> Latitude and longitude</label>
-          <p>Dashed borders show approximate extents around 401 BCE.</p>
-          <ul class="polity-legend" id="polity-legend" aria-label="Historical territories"></ul>
+          <p>Dashed borders show approximate extents around 401 BCE. Diamonds mark documented sites and communities. Small circles mark political centers.</p>
+          <ul class="polity-legend" id="polity-legend" aria-label="Expedition territory colors"></ul>
           <div class="compact-map" aria-label="Route symbols">
             <span><i class="key-stop" aria-hidden="true"></i> Identified stop</span>
             <span><i class="key-estimate" aria-hidden="true"></i> Approximate or disputed</span>
@@ -146,6 +153,12 @@
             <a href="https://www.naturalearthdata.com/about/terms-of-use/">Basemap</a>
             <a href="https://doi.org/10.1017/S0066154623000054">Theches study</a>
           </div>
+        </article>
+        <article id="world-notes">
+          <h2>The world around 401 BCE</h2>
+          <p>Shading covers selected ancient political territories. Symbols locate political centers, archaeological sites and communities where a territorial outline would overstate the evidence. Unshaded areas include inhabited lands.</p>
+          <p><a href="https://doi.org/10.1038/s41597-025-04516-9" id="world-data-paper">Cliopatria dataset paper</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a></p>
+          <div id="world-index" aria-label="World geography and sources"><p>Loading world geography…</p></div>
         </article>
         <article id="historical-notes">
           <h2>Historical layers</h2>

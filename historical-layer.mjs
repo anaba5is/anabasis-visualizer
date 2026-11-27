@@ -149,6 +149,27 @@ function showLabel(node, label, origin = { x: 0, y: 0 }) {
   node.setAttribute('y', round(label.y - origin.y));
 }
 
+function getCoverage(coords, rings) {
+  const locate = createProjector({ lon: coords[0], lat: coords[1], x: 0, y: 0, radius: 1 });
+  let minimumDepth = 1;
+  for (const ring of rings) {
+    for (const point of ring) minimumDepth = Math.min(minimumDepth, locate(point).depth);
+  }
+  const angularRadius = Math.acos(limit(minimumDepth, -1, 1));
+  return {
+    horizon: angularRadius < Math.PI / 2 ? -Math.sin(angularRadius) : -1,
+    chord: Math.sqrt(2 - 2 * minimumDepth),
+  };
+}
+
+function possiblyVisible(shape, view) {
+  const center = view.locate(shape.coords);
+  if (center.depth < shape.coverage.horizon) return false;
+  const reach = view.radius * shape.coverage.chord;
+  return center.x + reach >= 0 && center.x - reach <= view.width
+    && center.y + reach >= 0 && center.y - reach <= view.height;
+}
+
 export function addHistoricalLayer(map) {
   const holder = element('g', 'historical-layer');
   holder.setAttribute('aria-hidden', 'true');
@@ -156,9 +177,10 @@ export function addHistoricalLayer(map) {
   const territoryNames = element('g', 'political-names');
   const seats = element('g', 'administrative-seats');
   const neighbors = element('g', 'neighboring-places');
+  const worldSites = element('g', 'world-map-sites');
   const genericNames = new Map(Array.from(map.querySelectorAll('.map-label.land'), node => [node.textContent, node]));
 
-  const shapes = politicalRegions.map(region => {
+  function makeShape(region) {
     const shape = element('g', 'polity-shape');
     shape.dataset.polity = region.id;
     const definition = element('defs');
@@ -182,14 +204,20 @@ export function addHistoricalLayer(map) {
     label.dataset.polity = region.id;
     label.style.setProperty('--polity-fill', region.fillColor ?? region.color);
     territoryNames.append(label);
-    return { boundary, fill, label, coords: region.coords, rings: region.rings.map(sampleRing), major: region.id === 'achaemenid-empire' };
-  });
+    const rings = region.rings.map(sampleRing);
+    return {
+      id: region.id, boundary, fill, label, coords: region.coords, rings,
+      coverage: getCoverage(region.coords, rings),
+      major: region.overview ?? region.id === 'achaemenid-empire',
+    };
+  }
 
-  const anchors = administrations.map(administration => {
-    const { kind, coords } = administration;
+  function makeAnchor(administration) {
+    const { id, kind, coords } = administration;
+    const isWorldSite = ['polity', 'site', 'community'].includes(kind);
     const isNeighbor = kind === 'local' || kind === 'context';
     const group = element('g', `historical-point ${kind}`);
-    const hasMarker = kind === 'seat' || kind === 'local';
+    const hasMarker = isWorldSite || kind === 'seat' || kind === 'local';
     if (kind === 'seat') {
       const marker = element('rect', 'administration-point');
       marker.setAttribute('x', '-2.5');
@@ -204,20 +232,32 @@ export function addHistoricalLayer(map) {
       marker.setAttribute('r', '2.6');
       group.append(marker);
     }
+    if (isWorldSite) {
+      const marker = element(kind === 'polity' ? 'circle' : 'path', 'world-site-point');
+      if (kind === 'polity') marker.setAttribute('r', '3.4');
+      else marker.setAttribute('d', 'M0 -4L4 0L0 4L-4 0Z');
+      group.append(marker);
+    }
     const name = element('text', 'administration-name', administration.name);
     group.append(name);
-    (isNeighbor ? neighbors : seats).append(group);
-    return { coords, group, isNeighbor, hasMarker, label: name, duplicate: genericNames.get(administration.name) };
-  });
+    const parent = isWorldSite ? worldSites : isNeighbor ? neighbors : seats;
+    parent.append(group);
+    return {
+      id, coords, group, isNeighbor, isWorldSite, hasMarker, label: name,
+      overview: administration.overview ?? kind === 'polity',
+      duplicate: isWorldSite ? undefined : genericNames.get(administration.name),
+    };
+  }
 
-  holder.append(territories, territoryNames, seats, neighbors);
+  const shapes = politicalRegions.map(makeShape);
+  const anchors = administrations.map(makeAnchor);
+  holder.append(territories, seats, neighbors, worldSites, territoryNames);
   map.append(holder);
-  const features = [...shapes, ...anchors];
   let measuredWidth;
   let lastProjection;
 
   function refreshMetrics() {
-    for (const feature of features) feature.width = textWidth(feature.label);
+    for (const feature of [...shapes, ...anchors]) feature.width = textWidth(feature.label);
     measuredWidth = map.clientWidth;
   }
 
@@ -227,10 +267,12 @@ export function addHistoricalLayer(map) {
     const namesVisible = bordersVisible && layers.places !== false;
     const seatsVisible = layers.administration && view.scale > .33;
     const neighborsVisible = layers.neighbors && view.scale > .33;
+    const worldSitesVisible = layers.worldSites !== false;
     territories.style.display = bordersVisible ? '' : 'none';
     territoryNames.style.display = namesVisible ? '' : 'none';
     seats.style.display = seatsVisible ? '' : 'none';
     neighbors.style.display = neighborsVisible ? '' : 'none';
+    worldSites.style.display = worldSitesVisible ? '' : 'none';
     holder.classList.toggle('is-overview', view.scale < .35);
     if (view.width !== measuredWidth) refreshMetrics();
 
@@ -243,14 +285,18 @@ export function addHistoricalLayer(map) {
       const projection = [view.lon, view.lat, view.radius, view.x, view.y].join(',');
       for (const shape of shapes) {
         if (lastProjection !== projection) {
-          shape.paths = shape.rings.map(ring => ringPaths(ring, view));
+          shape.paths = possiblyVisible(shape, view) ? shape.rings.map(ring => ringPaths(ring, view)) : [];
           shape.fill.setAttribute('d', shape.paths.map(path => path.fill).join(''));
           shape.boundary.setAttribute('d', shape.paths.map(path => path.outline).join(''));
         }
         if (namesVisible) {
           const point = view.locate(shape.coords);
-          const labelAllowed = point.visible && point.depth > .16 && (shape.major || view.scale > .43)
-            && shape.paths.some(({ left, right }) => Math.min(right, bounds.right) - Math.max(left, bounds.left) > shape.width * .55);
+          const focused = shape.id === view.focusId;
+          const footprint = shape.paths.some(({ left, right }) =>
+            Math.min(right, bounds.right) - Math.max(left, bounds.left) > shape.width * .55,
+          );
+          const labelAllowed = point.visible && point.depth > .16
+            && (focused || ((shape.major || view.scale > .43) && footprint));
           let label = null;
           if (labelAllowed) {
             for (const offset of LABEL_OFFSETS) {
@@ -268,15 +314,17 @@ export function addHistoricalLayer(map) {
       lastProjection = projection;
     }
 
-    for (const { group, label, coords, width, isNeighbor, hasMarker, duplicate } of anchors) {
+    for (const { id, group, label, coords, width, isNeighbor, isWorldSite, hasMarker, overview, duplicate } of anchors) {
       let placement = null;
-      if (isNeighbor ? neighborsVisible : seatsVisible) {
+      const layerVisible = isWorldSite ? worldSitesVisible : isNeighbor ? neighborsVisible : seatsVisible;
+      if (layerVisible) {
         const point = view.locate(coords);
         const shown = onScreen(point, view) && (layers.places !== false || hasMarker);
         group.setAttribute('display', shown ? 'inline' : 'none');
         if (shown) {
           group.setAttribute('transform', `translate(${round(point.x)} ${round(point.y)})`);
-          if (layers.places !== false) {
+          const labelVisible = layers.places !== false && (!isWorldSite || overview || view.scale > .34 || id === view.focusId);
+          if (labelVisible) {
             const candidate = hasMarker
               ? labelBesideMarker(point, width, bounds, occupied) : centeredLabel(point, width, bounds, 3, 24);
             if (labelFits(candidate, bounds, occupied)) {
@@ -295,5 +343,11 @@ export function addHistoricalLayer(map) {
 
   refreshMetrics();
   drawHistoricalLayer.refreshMetrics = refreshMetrics;
+  drawHistoricalLayer.addWorld = (regions, sites) => {
+    shapes.push(...regions.map(makeShape));
+    anchors.push(...sites.map(makeAnchor));
+    lastProjection = undefined;
+    refreshMetrics();
+  };
   return drawHistoricalLayer;
 }

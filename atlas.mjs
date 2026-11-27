@@ -6,10 +6,12 @@ import { mapLabels, rivers, routeWaypoints, uncertainLegs } from './map-data.mjs
 import { createGlobe, createProjector } from './globe.mjs?v=8';
 import { makeTimeline } from './timeline.mjs?v=4';
 import { createPlayback } from './playback.mjs';
-import { addHistoricalLayer } from './historical-layer.mjs?v=8';
+import { addHistoricalLayer } from './historical-layer.mjs?v=10';
 import { historicalSources, politicalRegions } from './historical-data.mjs?v=6';
 import { createMapLabels } from './map-labels.mjs';
 import { connectPopover } from './popover.mjs';
+import { worldViews } from './world-sites.mjs';
+import { renderWorldIndex } from './world-index.mjs';
 
 const phases = [
   { name: 'March inland', color: '#f1b66f', timelineColor: '#a4662a' },
@@ -78,7 +80,10 @@ const readerPrevious = find('#reader-previous');
 const readerNext = find('#reader-next');
 const speedControl = find('#playback-speed');
 const followControl = find('#follow-camera');
-const layers = { route: true, terrain: true, borders: true, administration: false, neighbors: false, places: true, grid: true };
+const layers = {
+  route: true, terrain: true, borders: true, worldSites: true,
+  administration: false, neighbors: false, places: true, grid: true,
+};
 const scaleBar = find('#map-scale');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const routeCenter = { lon: 35.5, lat: 37.8 };
@@ -109,6 +114,7 @@ let trail;
 let tracer;
 let viewAtLastDraw;
 let beatProgress = 0;
+let worldFocus;
 let frameBounds;
 let lastSurfaceView;
 let lastProjectedView;
@@ -589,7 +595,7 @@ function cameraFrame() {
 
 function getView() {
   const frame = cameraFrame();
-  const view = { ...frame, ...camera, radius: frame.baseline * camera.scale };
+  const view = { ...frame, ...camera, radius: frame.baseline * camera.scale, focusId: worldFocus };
   view.locate = createProjector(view);
   return view;
 }
@@ -609,7 +615,7 @@ function draw() {
     surface.draw({ ...view, terrain: layers.terrain });
   }
   viewAtLastDraw = view;
-  const overlayKey = `${projection}|${selectedIndex}|${Object.values(layers).join(',')}`;
+  const overlayKey = `${projection}|${selectedIndex}|${worldFocus ?? ''}|${Object.values(layers).join(',')}`;
   if (lastProjectedView === overlayKey) {
     drawTrail(view);
     return;
@@ -709,6 +715,7 @@ function dismissIntro() {
 }
 
 function setMode(nextMode) {
+  if (nextMode !== 'free') worldFocus = undefined;
   if (nextMode === 'route') dismissIntro();
   awaitingIntro = false;
   mode = nextMode;
@@ -988,7 +995,7 @@ for (const region of politicalRegions) {
   polityLegend.append(entry);
 }
 polityLegend.hidden = !layers.borders;
-connectPopover(find('#layers-toggle'), layerMenu);
+const closeLayers = connectPopover(find('#layers-toggle'), layerMenu);
 const closePlaybackSettings = connectPopover(find('#playback-settings-toggle'), find('#playback-settings'));
 layerMenu.addEventListener('change', event => {
   if (!(event.target instanceof HTMLInputElement)) return;
@@ -998,6 +1005,70 @@ layerMenu.addEventListener('change', event => {
   if ((layer === 'administration' || layer === 'neighbors') && layers[layer] && camera.scale < .34) showPreset('route');
   queueDraw();
 });
+const worldViewPicker = find('#world-view');
+const worldIndex = find('#world-index');
+const worldHeading = find('#world-notes h2');
+worldHeading.tabIndex = -1;
+
+function focusWorld(entry, zoom) {
+  setPlaying(false);
+  dismissIntro();
+  setMode('free');
+  worldFocus = entry.id;
+  closeLayers();
+  if (sources.open) dismissSources();
+  goTo({ lon: entry.coords[0], lat: entry.coords[1], scale: zoom ?? globeScale() });
+  mapFrame.focus({ preventScroll: true });
+  announcement.textContent = 'Globe centered on ' + entry.name;
+}
+
+for (const region of worldViews) {
+  const option = html('option', '', region.name);
+  option.value = region.id;
+  worldViewPicker.append(option);
+}
+worldViewPicker.addEventListener('change', () => {
+  const region = worldViews.find(item => item.id === worldViewPicker.value);
+  if (!region) return;
+  worldViewPicker.value = '';
+  focusWorld({ ...region, id: undefined });
+});
+
+find('#open-world-index').addEventListener('click', () => {
+  setPlaying(false);
+  closeLayers();
+  sources.open = true;
+  worldHeading.focus();
+});
+
+surface.ready.then(async () => {
+  try {
+    const { worldRegions, worldSiteRecords } = await import('./world-history.mjs?v=9');
+    drawHistoricalLayer.addWorld(worldRegions, worldSiteRecords);
+    const expeditionPolities = politicalRegions.map(region => ({
+      ...region,
+      kind: 'territory',
+      group: region.id === 'achaemenid-empire' ? 'west-asia' : 'europe',
+    }));
+    renderWorldIndex(worldIndex, [...expeditionPolities, ...worldRegions, ...worldSiteRecords], entry => {
+      if (entry.kind === 'territory') layers.borders = true;
+      else layers.worldSites = true;
+      layers.places = true;
+      for (const key of ['borders', 'worldSites', 'places']) {
+        layerMenu.querySelector(`[data-layer="${key}"]`).checked = layers[key];
+      }
+      polityLegend.hidden = !layers.borders;
+      const zoom = entry.kind === 'territory' && entry.areaKm2 < 35000 ? 1.25 : .55;
+      focusWorld(entry, zoom);
+    });
+    lastProjectedView = undefined;
+    queueDraw();
+  } catch (error) {
+    worldIndex.replaceChildren(html('p', '', 'World geography could not load. Reload to try again.'));
+    console.error('World geography could not load', error);
+  }
+});
+
 for (const source of historicalSources) {
   const citation = link(source.name, source.url);
   citation.title = source.note;

@@ -6,7 +6,7 @@
 
 - **Begin the journey** or **Route** takes you from the globe overview to the expedition. Drag to rotate, scroll or pinch to zoom, and use **Globe** to return to the overview.
 - Choose a pin, a phase, or a timeline stop. On phones, **Stops** expands the timeline. **Play** traces each incoming leg. The playback menu controls speed and camera following.
-- **Layers** toggles terrain, the expedition, approximate political borders, administrative centers, neighboring peoples and cities, labels, and the grid.
+- **Layers** toggles terrain, the expedition, approximate political borders, and several kinds of labels and sites. **World view** rotates to a region. **Browse states and sites** opens the historical index with notes, sources, and globe links.
 - Open the selected scene for illustrations, text, and citations. Scene links use `#stop=<id>`.
 - With the globe focused, the arrow keys rotate it. With a timeline stop focused, the left and right arrows step through stops, and Home and End jump to the endpoints.
 
@@ -30,6 +30,7 @@ The loopback preview adds a **Type** menu for comparing the production fonts wit
 | Globe projection and WebGL / Canvas rendering | [globe.mjs](globe.mjs) |
 | Stop and place labels | [map-labels.mjs](map-labels.mjs), [label-geometry.mjs](label-geometry.mjs) |
 | Political borders and administrative labels | [historical-layer.mjs](historical-layer.mjs), [historical-data.mjs](historical-data.mjs) |
+| World polities and archaeological context | [world-history.mjs](world-history.mjs), [world-sites.mjs](world-sites.mjs), [world-context-asia.mjs](world-context-asia.mjs), [world-context-west.mjs](world-context-west.mjs) |
 | Timeline and playback | [timeline.mjs](timeline.mjs), [playback.mjs](playback.mjs) |
 | Narrative, citations, and artwork | [story.mjs](story.mjs), [scenes.mjs](scenes.mjs) |
 | Production typography | [typography.css](typography.css), [font licenses](assets/fonts) |
@@ -38,7 +39,7 @@ The loopback preview adds a **Type** menu for comparing the production fonts wit
 node --test tests/*.test.mjs
 ```
 
-The tests cover label geometry and collisions near screen edges and route pins. For a browser check, open an illustrated stop, toggle political borders in **Layers**, switch between **Route** and **Globe**, and try the mobile dock and scene reader.
+The tests cover label geometry near screen edges and route pins, plus dates, sources, and scope for world records. For a browser check, open an illustrated stop, toggle political borders in **Layers**, switch between **Route** and **Globe**, and try the mobile dock and scene reader.
 
 ## Publish
 
@@ -50,6 +51,7 @@ The route is a reconstruction of selected stops in Xenophon’s narrative. Dashe
 
 | Generated asset | Command |
 | --- | --- |
+| 401 BCE world polity geometry | `uv run scripts/build-world-polities.py` |
 | Regional rivers | `uv run scripts/build-map.py` |
 | Regional terrain and shoreline | `uv run scripts/build-globe-detail.py` |
 | Scene cards and thumbnails | `node scripts/build-scene-previews.mjs` with `cwebp` and `dwebp` installed |

@@ -68,3 +68,38 @@
   .historical-layer .polity-name, .historical-layer .administration-name { fill: #fff8e9; stroke: #071512; }
   .historical-layer .polity-casing { opacity: 1; }
 }
+
+.historical-layer .world-site-point {
+  fill: #e4c88d;
+  stroke: #183337;
+  stroke-width: 1.4px;
+  vector-effect: non-scaling-stroke;
+}
+.historical-layer .community .world-site-point { fill: #9bd0b4; }
+.historical-layer .polity .world-site-point { fill: #f5dca8; stroke-width: 1.8px; }
+.historical-layer .world-map-sites .administration-name { fill: #fff0d2; }
+
+.world-view-label { margin-bottom: .35rem; }
+.world-view-label select { max-width: 62%; }
+.world-index-button { margin-bottom: .4rem; }
+.world-index-button, .world-entry-actions button {
+  min-height: 2.15rem;
+  padding: .26rem .6rem;
+  border: 1px solid currentColor;
+  border-radius: .45rem;
+  background: transparent;
+  color: inherit;
+  font: 630 .8rem var(--body);
+  cursor: pointer;
+}
+.world-index-button:hover, .world-entry-actions button:hover { background: rgb(160 128 89 / .15); }
+
+#world-index details { border-top: 1px solid #d8c8ad; margin-top: .5rem; padding-top: .34rem; }
+#world-index summary { width: fit-content; cursor: pointer; font-size: .86rem; font-weight: 650; }
+#world-index ul { list-style: none; padding: 0; margin: .25rem 0 .6rem; }
+#world-index li { padding: .55rem 0; }
+#world-index li + li { border-top: 1px solid #e0d4be; }
+#world-index h3 { margin: 0; font-size: 1rem; font-weight: 650; }
+#world-index p { margin: .2rem 0; }
+.world-entry-kind { color: #685845; font-size: .73rem; font-weight: 620; }
+.world-entry-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; margin-top: .38rem; }
