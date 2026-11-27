@@ -1,17 +1,19 @@
-import { stops, journeyChapters } from './story.mjs?v=4';
-import { captions } from './captions.mjs?v=4';
+import { stops, journeyChapters } from './story.mjs';
+import { captions } from './captions.mjs';
 
 import { scenes } from './scenes.mjs';
-import { mapLabels, rivers, routeWaypoints, uncertainLegs } from './map-data.mjs?v=6';
-import { createGlobe, createProjector } from './globe.mjs?v=8';
-import { makeTimeline } from './timeline.mjs?v=4';
+import { mapLabels, routeWaypoints, uncertainLegs } from './map-data.mjs';
+import { createGlobe, createProjector } from './globe.mjs';
+import { makeTimeline } from './timeline.mjs';
 import { createPlayback } from './playback.mjs';
-import { addHistoricalLayer } from './historical-layer.mjs?v=10';
-import { historicalSources, politicalRegions } from './historical-data.mjs?v=6';
+import { addHistoricalLayer } from './historical-layer.mjs';
+import { historicalSources, politicalRegions } from './historical-data.mjs';
 import { createMapLabels } from './map-labels.mjs';
 import { connectPopover } from './popover.mjs';
-import { worldViews } from './world-sites.mjs';
-import { renderWorldIndex } from './world-index.mjs';
+import { readAtlasLocation, writeAtlasLocation } from './atlas-location.mjs';
+import { connectWorldPanel } from './world-panel.mjs';
+import { html, link } from './dom.mjs';
+import { bookFor, placeAndBook, formatStopDate, createSceneReader } from './scene-reader.mjs';
 
 const phases = [
   { name: 'March inland', color: '#f1b66f', timelineColor: '#a4662a' },
@@ -43,7 +45,9 @@ const atlasWindow = find('.atlas-window');
 const intro = find('#journey-intro');
 const mapModes = find('.map-mode');
 const mapTools = find('.map-controls');
+const worldCard = find('#world-focus-card');
 const phoneScene = find('#phone-scene');
+const phoneBegin = find('#phone-begin');
 const phoneThumb = find('#phone-thumb-image');
 const phoneStage = find('.phone-stage');
 const phonePlace = find('.phone-place');
@@ -67,17 +71,9 @@ const mapKey = find('.map-key');
 const navSources = find('.site-nav a');
 const closeSources = find('#close-sources');
 const fullscreen = find('#fullscreen-toggle');
-const imageViewer = find('#image-viewer');
-const readerImage = imageViewer.querySelector('img');
-const readerCaption = imageViewer.querySelector('figcaption');
-const readerRegion = find('#scene-viewer-region');
-const readerCopy = find('#scene-viewer-copy');
 const timelineBook = find('#timeline-book');
 const stopCounter = find('#stop-counter');
 const playLabel = find('#play-label');
-const readerTitle = find('#image-viewer-title');
-const readerPrevious = find('#reader-previous');
-const readerNext = find('#reader-next');
 const speedControl = find('#playback-speed');
 const followControl = find('#follow-camera');
 const layers = {
@@ -94,6 +90,8 @@ const labelNodes = [];
 const routeNodes = [];
 const gridNodes = [];
 const riverNodes = [];
+let riverLayer;
+let riverRequest;
 const mapLabelNodes = [];
 const labelRenderer = createMapLabels(stops, labelNodes, mapLabelNodes, labelLayouts);
 const pointers = new Map();
@@ -115,29 +113,17 @@ let tracer;
 let viewAtLastDraw;
 let beatProgress = 0;
 let worldFocus;
+let worldPanel;
+let worldFocusMarker;
 let frameBounds;
 let lastSurfaceView;
 let lastProjectedView;
-let readerReturnFocus;
 
 function svg(tag, attrs = {}, content = '') {
   const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
   for (const [name, value] of Object.entries(attrs)) node.setAttribute(name, value);
   node.textContent = content;
   return node;
-}
-
-function html(tag, className = '', content = '') {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  node.textContent = content;
-  return node;
-}
-
-function link(text, href, className = '') {
-  const anchor = html('a', className, text);
-  anchor.href = href;
-  return anchor;
 }
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -186,11 +172,8 @@ function setupBase() {
   for (let lat = 25; lat <= 50; lat += 5) {
     addGrid(Array.from({ length: 39 }, (_, step) => [18 + step, lat]), true);
   }
-  for (const river of rivers) {
-    const node = svg('path', { class: 'map-river' });
-    riverNodes.push({ node, lines: river.lines });
-    base.append(node);
-  }
+  riverLayer = svg('g');
+  base.append(riverLayer);
   const labels = [...mapLabels].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
   for (const label of labels) {
     const { name, kind, minScale } = label;
@@ -337,14 +320,6 @@ function setupPhases() {
   });
 }
 
-function bookFor(stop) {
-  return ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][Number(stop.book[0]) - 1];
-}
-
-function placeAndBook(stop) {
-  return `${stop.region} · Book ${bookFor(stop)}`;
-}
-
 function sceneFigure(scene) {
   const figure = html('figure', 'scene');
   const image = html('img', scene.contain ? 'contain' : '');
@@ -356,70 +331,8 @@ function sceneFigure(scene) {
   return figure;
 }
 
-function passageNotes(stop, scene) {
-  const notes = html('details', 'stop-notes');
-  const citation = html('p', 'text-citation', `Xenophon, Anabasis ${stop.book}`);
-  const chapters = new Set([...stop.book.matchAll(/\b([1-7])\.(\d+)\.\d+/g)]
-    .map(([, book, chapter]) => `${book}.${chapter}`));
-  const links = html('div', 'passage-links');
-  for (const reference of chapters) {
-    const [book, chapter] = reference.split('.');
-    const url = stop.source.replace(/Book_\d+\/Chapter_\d+$/, `Book_${book}/Chapter_${chapter}`);
-    links.append(link(`Read ${reference}`, url));
-  }
-  const credit = html('p', 'image-credit', 'Image ');
-  credit.append(link(scene.credit, scene.source));
-  if (scene.licenseUrl) credit.append(' · ', link(scene.licenseName, scene.licenseUrl));
-  notes.append(
-    html('summary', '', 'Passages & image credit'),
-    html('p', '', `Location ${stop.certainty.toLowerCase()}`),
-    citation,
-    links,
-    credit,
-  );
-  return notes;
-}
-
-function renderReader(stop, i) {
-  const scene = scenes[stop.id];
-  readerRegion.textContent = placeAndBook(stop);
-  readerTitle.textContent = stop.name;
-  readerImage.src = `./assets/${scene.file}`;
-  readerImage.alt = scene.alt;
-  readerCaption.textContent = scene.caption;
-  const content = document.createDocumentFragment();
-  const chapter = journeyChapters[stop.phase];
-  if (chapter && stops[i - 1]?.phase !== stop.phase) {
-    const opening = html('section', 'reader-context');
-    opening.append(
-      html('h3', '', chapter.title),
-      html('p', '', chapter.synopsis),
-      link(`Read Xenophon ${chapter.book}`, chapter.source),
-    );
-    content.append(opening);
-  }
-  content.append(html('h3', '', stop.title), html('p', '', stop.summary), html('p', '', stop.detail));
-  if (stop.whyItMatters) content.append(html('p', 'reader-takeaway', stop.whyItMatters));
-  content.append(passageNotes(stop, scene));
-  readerCopy.replaceChildren(content);
-  readerPrevious.disabled = i === 0;
-  readerNext.disabled = i === stops.length - 1;
-  imageViewer.scrollTop = 0;
-}
-
 function openScene(trigger) {
-  setPlaying(false);
-  readerReturnFocus = trigger;
-  renderReader(stops[selectedIndex], selectedIndex);
-  imageViewer.showModal();
-}
-
-function stepReader(delta) {
-  const next = selectedIndex + delta;
-  if (!stops[next]) return;
-  chooseStop(next);
-  renderReader(stops[next], next);
-  readerTitle.focus({ preventScroll: true });
+  sceneReader.open(trigger);
 }
 
 function renderStory(stop, i) {
@@ -447,22 +360,22 @@ function renderStory(stop, i) {
   storyContent.replaceChildren(sceneFigure(scene), copy, expand);
 
   phoneThumb.src = `./assets/previews/thumb-${scene.file}`;
-  phoneStage.textContent = `Book ${book} · ${i + 1} / ${stops.length}`;
+  phoneStage.textContent = `${formatStopDate(stop)} · ${i + 1} / ${stops.length}`;
   phonePlace.textContent = stop.name;
   phoneScene.setAttribute('aria-label', `Details for ${stop.name}`);
-  timelineBook.textContent = `Book ${book}`;
+  timelineBook.textContent = `Book ${book} · ${formatStopDate(stop)}`;
   stopCounter.textContent = `${String(i + 1).padStart(2, '0')} / ${stops.length}`;
   previousButton.disabled = i === 0;
   nextButton.disabled = i === stops.length - 1;
 }
 
 function bookmark(i) {
-  history.replaceState(null, '', `#stop=${stops[i].id}`);
+  history.replaceState(null, '', writeAtlasLocation('stop', stops[i].id));
 }
 
 function chooseStop(i) {
   if (!stops[i]) return;
-  if (awaitingIntro || !intro.hidden || mode === 'globe') setMode('route');
+  if (worldFocus || awaitingIntro || !intro.hidden || mode === 'globe') setMode('route');
   setPlaying(false);
   selectStop(i);
   playback.reset(beatDuration(i));
@@ -533,6 +446,10 @@ function setPlaying(playing) {
     }
     return;
   }
+  if (worldFocus) {
+    setMode('route');
+    bookmark(selectedIndex);
+  }
   dismissIntro();
   const progress = playback.getProgress();
   if (selectedIndex === stops.length - 1 && progress === 1) {
@@ -561,6 +478,7 @@ function measureCameraFrame() {
   const top = Math.max(
     layoutBox(masthead)?.bottom ?? 0,
     layoutBox(phaseControls)?.bottom ?? 0,
+    width < 690 ? layoutBox(worldCard)?.bottom ?? 0 : 0,
   ) - mapBox.top + 9;
   let left = padding;
   let right = width - padding;
@@ -595,13 +513,25 @@ function cameraFrame() {
 
 function getView() {
   const frame = cameraFrame();
-  const view = { ...frame, ...camera, radius: frame.baseline * camera.scale, focusId: worldFocus };
+  const view = { ...frame, ...camera, radius: frame.baseline * camera.scale, focusId: worldFocus?.id };
   view.locate = createProjector(view);
   return view;
 }
 
 function globeScale() {
   return cameraFrame().world;
+}
+
+function loadRivers() {
+  riverRequest ??= import('./assets/map-geometry.mjs').then(({ rivers }) => {
+    for (const river of rivers) {
+      const node = svg('path', { class: 'map-river' });
+      riverNodes.push({ node, lines: river.lines });
+      riverLayer.append(node);
+    }
+    lastProjectedView = undefined;
+    queueDraw();
+  }).catch(error => console.error('River data could not load', error));
 }
 
 function draw() {
@@ -615,7 +545,7 @@ function draw() {
     surface.draw({ ...view, terrain: layers.terrain });
   }
   viewAtLastDraw = view;
-  const overlayKey = `${projection}|${selectedIndex}|${worldFocus ?? ''}|${Object.values(layers).join(',')}`;
+  const overlayKey = `${projection}|${selectedIndex}|${worldFocus?.id ?? ''}|${Object.values(layers).join(',')}`;
   if (lastProjectedView === overlayKey) {
     drawTrail(view);
     return;
@@ -627,18 +557,22 @@ function draw() {
   routeLayer.style.display = layers.route ? '' : 'none';
   markerLayer.style.display = layers.route ? '' : 'none';
   namesLayer.style.display = layers.route && layers.places ? '' : 'none';
-  const { occupied: stopLabels, selectedBox } = labelRenderer.drawStops(view, positions, selectedIndex, layers);
-  const routeAnchor = layers.route ? { ...positions[selectedIndex], labelBox: selectedBox } : null;
-  const historicalLabels = drawHistoricalLayer(view, layers, routeAnchor) ?? [];
   const pinBounds = layers.route ? positions.flatMap((point, i) => {
     if (!point.visible || (i !== selectedIndex && view.scale <= .39)) return [];
     const r = i === selectedIndex ? 12 : 7;
     return [{ left: point.x - r, right: point.x + r, top: point.y - r, bottom: point.y + r }];
   }) : [];
+  const { occupied: stopLabels, selectedBox } = labelRenderer.drawStops(view, positions, selectedIndex, layers, pinBounds);
+  const routeAnchor = layers.route ? { ...positions[selectedIndex], labelBox: selectedBox } : null;
+  const historicalLabels = drawHistoricalLayer(view, layers, routeAnchor) ?? [];
+  const focusedPlace = worldFocus?.kind ? view.locate(worldFocus.coords) : undefined;
+  worldFocusMarker.setAttribute('visibility', focusedPlace?.visible ? 'visible' : 'hidden');
+  if (focusedPlace?.visible) worldFocusMarker.setAttribute('transform', `translate(${focusedPlace.x} ${focusedPlace.y})`);
   labelRenderer.drawPlaces(view, [...stopLabels, ...historicalLabels, ...pinBounds], layers.places);
   for (const { node, points, regional } of gridNodes) {
     node.setAttribute('d', layers.grid && regional === (view.scale >= .52) ? linePath(points, view) : '');
   }
+  if (view.scale > .48) loadRivers();
   for (const { node, lines } of riverNodes) {
     node.setAttribute('d', view.scale > .48 ? lines.map(line => linePath(line, view)).join('') : '');
   }
@@ -715,7 +649,12 @@ function dismissIntro() {
 }
 
 function setMode(nextMode) {
-  if (nextMode !== 'free') worldFocus = undefined;
+  if (nextMode !== 'free' && worldFocus) {
+    worldFocus = undefined;
+    worldPanel.hide();
+    atlasWindow.classList.remove('world-focused');
+    frameBounds = undefined;
+  }
   if (nextMode === 'route') dismissIntro();
   awaitingIntro = false;
   mode = nextMode;
@@ -806,11 +745,12 @@ function keyboardGlobe(event) {
 
 function selectFromHash() {
   if (location.hash === '#sources') sources.open = true;
-  if (!location.hash.startsWith('#stop=')) return false;
-  const index = indexById.get(location.hash.slice('#stop='.length));
+  const target = readAtlasLocation(location.hash);
+  if (target?.type !== 'stop') return false;
+  const index = indexById.get(target.id);
   if (index === undefined) return false;
   setPlaying(false);
-  if (!intro.hidden) setMode('route');
+  if (worldFocus || !intro.hidden) setMode('route');
   selectStop(index, { updateHash: false });
   playback.reset(beatDuration(index));
   syncPlayButton(false);
@@ -822,15 +762,17 @@ setupBase();
 drawHistoricalLayer = addHistoricalLayer(map);
 setupRoute();
 setupMarkers();
+worldFocusMarker = svg('g', { class: 'world-focus-marker', visibility: 'hidden', 'aria-hidden': 'true' });
+worldFocusMarker.append(svg('circle', { r: 10 }), svg('circle', { r: 3.5 }));
+map.append(worldFocusMarker);
 setupPhases();
 const timeline = makeTimeline(find('#stop-timeline'), stops, phases, chooseStop);
 const stations = find('.route-timeline__viewport');
 stations.id = 'journey-stations';
-readerTitle.tabIndex = -1;
 const playback = createPlayback({
   onAdvance() {
     if (selectedIndex === stops.length - 1) return false;
-    selectStop(selectedIndex + 1, { move: false });
+    selectStop(selectedIndex + 1, { move: false, announce: false });
     playback.setDuration(beatDuration());
     followLeg(selectedIndex);
     return true;
@@ -840,9 +782,25 @@ const playback = createPlayback({
     timeline.setProgress(fraction);
     drawTrail();
   },
-  onStateChange: syncPlayButton,
+  onStateChange(playing) {
+    syncPlayButton(playing);
+    if (!playing) {
+      const finished = selectedIndex === stops.length - 1 && playback.getProgress() === 1;
+      announcement.textContent = (finished ? 'Journey complete at ' : 'Playback paused at ') + stops[selectedIndex].name;
+    }
+  },
 });
-if (location.hash.startsWith('#stop=') && indexById.has(location.hash.slice(6))) {
+const sceneReader = createSceneReader(find('#image-viewer'), {
+  index: () => selectedIndex,
+  select: chooseStop,
+  pause: () => setPlaying(false),
+  fallbackFocus() {
+    const trigger = phoneScene.getClientRects().length ? phoneScene : find('.scene-action');
+    return trigger?.getClientRects().length ? trigger : mapFrame;
+  },
+});
+const initialLocation = readAtlasLocation(location.hash);
+if (initialLocation?.type === 'stop' && indexById.has(initialLocation.id)) {
   dismissIntro();
   awaitingIntro = false;
   mode = 'route';
@@ -859,7 +817,6 @@ function refreshTypography() {
   resizeMap();
 }
 
-document.addEventListener('atlas:type-preview', refreshTypography);
 document.fonts.addEventListener('loadingdone', refreshTypography);
 
 function resizeMap() {
@@ -870,7 +827,7 @@ function resizeMap() {
 
 const observer = new ResizeObserver(resizeMap);
 for (const node of [mapFrame, masthead, phaseControls, timelinePanel, storyPanel, mapModes, mapTools]) observer.observe(node);
-surface.ready?.then(queueDraw);
+surface.ready.then(queueDraw);
 queueDraw();
 
 function setStationsExpanded(expanded) {
@@ -893,13 +850,9 @@ timelinePanel.addEventListener('keydown', event => {
   }
 });
 phoneScene.addEventListener('click', () => openScene(phoneScene));
-readerPrevious.addEventListener('click', () => stepReader(-1));
-readerNext.addEventListener('click', () => stepReader(1));
-imageViewer.addEventListener('close', () => {
-  const fallback = phoneScene.getClientRects().length ? phoneScene : find('.scene-action');
-  const returnTo = readerReturnFocus?.isConnected && readerReturnFocus.getClientRects().length
-    ? readerReturnFocus : fallback;
-  (returnTo?.getClientRects().length ? returnTo : mapFrame).focus({ preventScroll: true });
+phoneBegin.addEventListener('click', () => {
+  chooseStop(0);
+  phoneScene.focus({ preventScroll: true });
 });
 find('#begin-journey').addEventListener('click', () => {
   chooseStop(0);
@@ -922,9 +875,11 @@ followControl.addEventListener('change', () => {
 });
 zoomIn.addEventListener('click', () => changeZoom(1.36));
 zoomOut.addEventListener('click', () => changeZoom(1 / 1.36));
-function showPreset(mode) {
+function showPreset(preset) {
+  const returningFromWorld = Boolean(worldFocus);
   setPlaying(false);
-  setMode(mode);
+  setMode(preset);
+  if (returningFromWorld) bookmark(selectedIndex);
 }
 reset.addEventListener('click', () => showPreset('route'));
 viewRoute.addEventListener('click', () => showPreset('route'));
@@ -1005,68 +960,44 @@ layerMenu.addEventListener('change', event => {
   if ((layer === 'administration' || layer === 'neighbors') && layers[layer] && camera.scale < .34) showPreset('route');
   queueDraw();
 });
-const worldViewPicker = find('#world-view');
-const worldIndex = find('#world-index');
-const worldHeading = find('#world-notes h2');
-worldHeading.tabIndex = -1;
-
-function focusWorld(entry, zoom) {
-  setPlaying(false);
-  dismissIntro();
-  setMode('free');
-  worldFocus = entry.id;
-  closeLayers();
-  if (sources.open) dismissSources();
-  goTo({ lon: entry.coords[0], lat: entry.coords[1], scale: zoom ?? globeScale() });
-  mapFrame.focus({ preventScroll: true });
-  announcement.textContent = 'Globe centered on ' + entry.name;
-}
-
-for (const region of worldViews) {
-  const option = html('option', '', region.name);
-  option.value = region.id;
-  worldViewPicker.append(option);
-}
-worldViewPicker.addEventListener('change', () => {
-  const region = worldViews.find(item => item.id === worldViewPicker.value);
-  if (!region) return;
-  worldViewPicker.value = '';
-  focusWorld({ ...region, id: undefined });
-});
-
-find('#open-world-index').addEventListener('click', () => {
-  setPlaying(false);
-  closeLayers();
-  sources.open = true;
-  worldHeading.focus();
-});
-
-surface.ready.then(async () => {
-  try {
-    const { worldRegions, worldSiteRecords } = await import('./world-history.mjs?v=9');
-    drawHistoricalLayer.addWorld(worldRegions, worldSiteRecords);
-    const expeditionPolities = politicalRegions.map(region => ({
-      ...region,
-      kind: 'territory',
-      group: region.id === 'achaemenid-empire' ? 'west-asia' : 'europe',
-    }));
-    renderWorldIndex(worldIndex, [...expeditionPolities, ...worldRegions, ...worldSiteRecords], entry => {
-      if (entry.kind === 'territory') layers.borders = true;
-      else layers.worldSites = true;
-      layers.places = true;
-      for (const key of ['borders', 'worldSites', 'places']) {
-        layerMenu.querySelector(`[data-layer="${key}"]`).checked = layers[key];
-      }
-      polityLegend.hidden = !layers.borders;
-      const zoom = entry.kind === 'territory' && entry.areaKm2 < 35000 ? 1.25 : .55;
-      focusWorld(entry, zoom);
-    });
+worldPanel = connectWorldPanel({
+  onLayerReady(regions, sites) {
+    drawHistoricalLayer.addWorld(regions, sites);
     lastProjectedView = undefined;
     queueDraw();
-  } catch (error) {
-    worldIndex.replaceChildren(html('p', '', 'World geography could not load. Reload to try again.'));
-    console.error('World geography could not load', error);
-  }
+  },
+  onBrowse() {
+    setPlaying(false);
+    closeLayers();
+    sources.open = true;
+    const heading = find('#world-notes h2');
+    heading.tabIndex = -1;
+    heading.focus();
+  },
+  onFocus(entry, zoom) {
+    setPlaying(false);
+    dismissIntro();
+    setMode('free');
+    worldFocus = entry;
+    atlasWindow.classList.add('world-focused');
+    frameBounds = undefined;
+    if (entry.kind === 'territory') layers.borders = true;
+    if (entry.kind && entry.kind !== 'territory') layers.worldSites = true;
+    if (entry.kind) layers.places = true;
+    for (const key of ['borders', 'worldSites', 'places']) {
+      layerMenu.querySelector(`[data-layer="${key}"]`).checked = layers[key];
+    }
+    polityLegend.hidden = !layers.borders;
+    closeLayers();
+    if (sources.open) dismissSources();
+    goTo({ lon: entry.coords[0], lat: entry.coords[1], scale: zoom ?? globeScale() });
+    worldCard.querySelector('button').focus({ preventScroll: true });
+    announcement.textContent = 'Globe centered on ' + entry.name;
+  },
+  onReturn() {
+    showPreset('route');
+    viewRoute.focus({ preventScroll: true });
+  },
 });
 
 for (const source of historicalSources) {
@@ -1074,13 +1005,9 @@ for (const source of historicalSources) {
   citation.title = source.note;
   find('#historical-links').append(citation);
 }
-imageViewer.addEventListener('click', event => {
-  if (event.target !== imageViewer) return;
-  const box = imageViewer.getBoundingClientRect();
-  if (event.clientX < box.left || event.clientX > box.right
-    || event.clientY < box.top || event.clientY > box.bottom) imageViewer.close();
+window.addEventListener('hashchange', () => {
+  if (!selectFromHash()) worldPanel.syncFromHash();
 });
-window.addEventListener('hashchange', selectFromHash);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) setPlaying(false);
 });

@@ -31,6 +31,7 @@ export const journeyChapters = {
 export const stops = [
   {
     id: 'sardis',
+    date: '401 BCE',
     name: 'Sardis',
     region: 'Lydia',
     phase: 'March inland',
@@ -44,6 +45,7 @@ export const stops = [
   },
   {
     id: 'tarsus',
+    date: '401 BCE',
     name: 'Tarsus',
     region: 'Cilicia',
     phase: 'March inland',
@@ -57,6 +59,7 @@ export const stops = [
   },
   {
     id: 'thapsacus',
+    date: '401 BCE',
     name: 'Thapsacus',
     region: 'Euphrates',
     phase: 'March inland',
@@ -70,6 +73,7 @@ export const stops = [
   },
   {
     id: 'cunaxa',
+    date: '401 BCE',
     name: 'Cunaxa',
     region: 'Babylonia',
     phase: 'March inland',
@@ -84,6 +88,7 @@ export const stops = [
   },
   {
     id: 'great-zab',
+    date: '401–400 BCE',
     name: 'Great Zab',
     region: 'Upper Mesopotamia',
     phase: 'Retreat',
@@ -98,6 +103,7 @@ export const stops = [
   },
   {
     id: 'mespila',
+    date: '401–400 BCE',
     name: 'Mespila',
     region: 'Tigris Valley',
     phase: 'Retreat',
@@ -111,6 +117,7 @@ export const stops = [
   },
   {
     id: 'carduchian-mountains',
+    date: '401–400 BCE',
     name: 'Carduchian Mountains',
     region: 'Upper Tigris',
     phase: 'Retreat',
@@ -124,6 +131,7 @@ export const stops = [
   },
   {
     id: 'armenian-highlands',
+    date: 'Winter 401–400 BCE',
     name: 'Armenian Highlands',
     region: 'Eastern Anatolia',
     phase: 'Retreat',
@@ -137,20 +145,23 @@ export const stops = [
   },
   {
     id: 'mount-theches',
+    date: '400 BCE',
     name: 'Mount Theches',
     region: 'Pontic Mountains',
     phase: 'Retreat',
     title: 'The sea! The sea!',
     book: '4.7.19–27, 4.8.1–22',
     summary: 'A guide promises to show the army the sea in five days. When the front ranks reach the height, the cry runs back along the column.',
-    detail: 'Xenophon hears shouting and thinks the front of the column is under attack. As he rides forward he hears the men calling “Thalatta! Thalatta!” The soldiers and officers embrace and weep, then pile up stones to mark the place. The ridge near İskobel is one possible site for Theches.',
+    detail: 'Xenophon hears shouting and thinks the front of the column is under attack. As he rides forward he hears the men calling “Thalatta! Thalatta!” The soldiers and officers embrace and weep, then pile up stones to mark the place. Xenophon records several further stages through the lands of the Macronians and Colchians before reaching Trapezus. The marker uses the proposed ridge near İskobel. The dashed leg shows the connection schematically.',
     whyItMatters: 'The sea gives the army a coast to follow and Greek ports to reach. The soldiers still have to make their way down to the shore.',
     source: readChapter(4, 7),
     coords: [39.69, 40.69],
+    locationSource: 'https://doi.org/10.1017/S0066154623000054',
     certainty: 'Disputed',
   },
   {
     id: 'trapezus',
+    date: '400 BCE',
     name: 'Trapezus',
     region: 'Black Sea coast',
     phase: 'Black Sea',
@@ -164,6 +175,7 @@ export const stops = [
   },
   {
     id: 'cotyora',
+    date: '400 BCE',
     name: 'Cotyora',
     region: 'Pontus',
     phase: 'Black Sea',
@@ -177,6 +189,7 @@ export const stops = [
   },
   {
     id: 'calpe',
+    date: '400 BCE',
     name: 'Calpe Harbor',
     region: 'Bithynia',
     phase: 'Black Sea',
@@ -190,6 +203,7 @@ export const stops = [
   },
   {
     id: 'byzantium',
+    date: '400 BCE',
     name: 'Byzantium',
     region: 'Bosporus',
     phase: 'Aftermath',
@@ -204,6 +218,7 @@ export const stops = [
   },
   {
     id: 'salmydessus',
+    date: '400–399 BCE',
     name: 'Salmydessus',
     region: 'Thrace',
     phase: 'Aftermath',
@@ -217,6 +232,7 @@ export const stops = [
   },
   {
     id: 'pergamum',
+    date: '399 BCE',
     name: 'Pergamum',
     region: 'Mysia',
     phase: 'Aftermath',

@@ -6,7 +6,7 @@ export const scenes = {
   sardis: {
     file: 'sardis.webp',
     alt: 'Two standing columns rise above the ruins of Sardis under an orange and blue sky.',
-    caption: 'The Temple of Artemis at Sardis in a nineteenth-century painting.',
+    caption: 'A nineteenth-century painting of Sardis. Construction of the Temple of Artemis shown here began in the third century BCE.',
     credit: 'Eduard Hildebrandt, c. 1851',
     source: 'https://commons.wikimedia.org/wiki/File:HildebrandtSardes.png',
     licenseUrl: publicDomain,
@@ -134,7 +134,7 @@ export const scenes = {
   pergamum: {
     file: 'pergamum-theatre.webp',
     alt: 'Stone theatre seating and ruin walls on a steep hillside above modern Bergama.',
-    caption: 'Pergamum’s later Hellenistic theatre above modern Bergama.',
+    caption: 'The Hellenistic theatre above modern Bergama was built after Xenophon’s expedition.',
     credit: 'Tomisti, 2011, resized and converted to WebP',
     source: 'https://commons.wikimedia.org/wiki/File:Pergamon_theatre_panorama_2.jpg',
     licenseUrl: 'https://creativecommons.org/licenses/by-sa/3.0/',

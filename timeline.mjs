@@ -34,7 +34,7 @@ export function makeTimeline(container, stops, phases, onSelect) {
     button.type = 'button';
     button.tabIndex = -1;
     const description = `${index + 1} of ${stops.length}, ${stop.name}, ${stop.phase}`;
-    button.setAttribute('aria-label', book ? `${description}, Book ${book}` : description);
+    button.setAttribute('aria-label', book ? `${description}, Book ${book}, circa ${stop.date}` : description);
     button.addEventListener('click', () => onSelect(index));
 
     const dot = document.createElement('span');
@@ -109,7 +109,7 @@ export function makeTimeline(container, stops, phases, onSelect) {
     selectedIndex = index;
     range.value = String(index + 1);
     const description = `${index + 1} of ${stops.length}, ${stops[index].name}`;
-    range.setAttribute('aria-valuetext', selected.book ? `${description}, Book ${selected.book}` : description);
+    range.setAttribute('aria-valuetext', selected.book ? `${description}, Book ${selected.book}, circa ${stops[index].date}` : description);
 
     const focused = document.activeElement;
     const tabStop = track.contains(focused) ? focused : selected.button;

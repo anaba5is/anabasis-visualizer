@@ -1,5 +1,3 @@
-export { rivers } from './assets/map-geometry.mjs?v=2';
-
 // Higher-priority labels take precedence at a shared screen position. Regional
 // anchors are representative points. Optional offsets position text in screen pixels.
 export const mapLabels = [

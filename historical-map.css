@@ -103,3 +103,34 @@
 #world-index p { margin: .2rem 0; }
 .world-entry-kind { color: #685845; font-size: .73rem; font-weight: 620; }
 .world-entry-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; margin-top: .38rem; }
+
+.world-focus-card {
+  position: fixed;
+  z-index: 7;
+  right: var(--atlas-right);
+  top: calc(var(--atlas-top) + var(--atlas-header) + .62rem);
+  width: min(18rem, calc(100vw - 1.2rem));
+  padding: .65rem .76rem;
+  border: 1px solid var(--glass-edge);
+  border-radius: .75rem;
+  background: #1a322d;
+  color: #fff1d8;
+}
+.world-focus-card h2 { margin: 0; font: 400 1.28rem/1.1 var(--display); }
+.world-focus-card p { margin: .3rem 0; font-size: .74rem; line-height: 1.36; }
+.world-focus-card a { color: #f1d3a2; font-size: .77rem; }
+.world-focused .story-panel,
+.world-focused .phone-scene,
+.world-focused #scene-toggle { display: none; }
+.world-focus-marker { pointer-events: none; }
+.world-focus-marker circle {
+  fill: #253834;
+  fill-opacity: .35;
+  stroke: #fae2a6;
+  stroke-width: 2px;
+}
+.world-focus-marker circle + circle { fill: #fae2a6; fill-opacity: 1; }
+
+@media (max-width: 32rem) {
+  .world-focus-card { left: var(--atlas-left); width: auto; }
+}

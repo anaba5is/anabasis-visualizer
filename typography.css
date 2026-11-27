@@ -47,49 +47,49 @@
   --display: "GFS Didot", Georgia, serif;
   --body: "Commissioner", system-ui, sans-serif;
 }
-:root:not([data-typeface="current"], [data-typeface="scholar"]) .stop-title,
-:root:not([data-typeface="current"], [data-typeface="scholar"]) .scene-viewer-copy h3 { font-style: normal; }
-:root:not([data-typeface="current"]) #stop-counter,
-:root:not([data-typeface="current"]) .map-scale {
+.stop-title,
+.scene-viewer-copy h3 { font-style: normal; }
+#stop-counter,
+.map-scale {
   font-family: system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
 }
 
-:root:not([data-typeface="current"]) .wordmark h1 {
+.wordmark h1 {
   font-size: clamp(1.37rem, 2vw, 1.95rem);
   letter-spacing: -.025em;
 }
-:root:not([data-typeface="current"]) .journey-intro h2 {
+.journey-intro h2 {
   font-size: clamp(3rem, 4.75vw, 6.35rem);
   line-height: .98;
   letter-spacing: -.047em;
 }
-:root:not([data-typeface="current"]) .story-panel .stop-name {
+.story-panel .stop-name {
   font-size: clamp(1.9rem, 2.62vw, 3rem);
   line-height: 1.02;
 }
-:root:not([data-typeface="current"]) .scene-viewer h2 {
+.scene-viewer h2 {
   font-size: clamp(1.4rem, 3.65vw, 2.8rem);
   line-height: 1.04;
 }
-:root:not([data-typeface="current"]) .phone-place {
+.phone-place {
   font-size: clamp(.97rem, 3.67vw, 1.21rem);
   letter-spacing: -.025em;
 }
 
 @media (max-width: 52rem) {
-  :root:not([data-typeface="current"]) .wordmark h1 {
+  .wordmark h1 {
     font-size: clamp(1.02rem, 4.38vw, 1.52rem);
   }
 }
 
 @media (min-width: 52.01rem) and (max-height: 44rem) {
-  :root:not([data-typeface="current"]) .journey-intro h2 {
+  .journey-intro h2 {
     font-size: clamp(2.55rem, 4.29vw, 4.5rem);
   }
 }
 
-:root:not([data-typeface="current"]) .phone-place {
+.phone-place {
   display: -webkit-box;
   white-space: normal;
   -webkit-box-orient: vertical;

@@ -8,19 +8,14 @@
   <title>Anabasis Visualizer</title>
   <link rel="icon" href="./assets/mark.svg" type="image/svg+xml">
   <link rel="preload" href="./assets/fonts/gfs-didot-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="./assets/globe-relief.webp" as="image" fetchpriority="high">
-  <link rel="stylesheet" href="./styles.css?v=8">
-  <link rel="stylesheet" href="./timeline.css?v=4">
-  <link rel="stylesheet" href="./fullscreen.css?v=2">
-  <link rel="stylesheet" href="./glass.css?v=3">
-  <link rel="stylesheet" href="./experience.css?v=6">
-  <link rel="stylesheet" href="./mobile.css">
-  <link rel="stylesheet" href="./historical-map.css?v=9">
-  <link rel="stylesheet" href="./typography.css?v=8">
-  <script type="module" src="./atlas.mjs?v=10"></script>
-  <script type="module">
-    if (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) import('./type-preview.mjs?v=8');
-  </script>
+  <link rel="preload" href="./assets/globe-relief-compact.webp" as="image" fetchpriority="high" media="(max-width: 52rem)">
+  <link rel="preload" href="./assets/globe-relief.webp" as="image" fetchpriority="high" media="(min-width: 52.001rem)">
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./timeline.css">
+  <link rel="stylesheet" href="./layout.css">
+  <link rel="stylesheet" href="./historical-map.css">
+  <link rel="stylesheet" href="./typography.css">
+  <script type="module" src="./atlas.mjs"></script>
 </head>
 <body>
   <a class="skip-link" href="#timeline">Skip to the timeline</a>
@@ -89,16 +84,20 @@
           <label><input type="checkbox" data-layer="neighbors"> Nearby peoples and cities</label>
           <label><input type="checkbox" data-layer="places" checked> Place names</label>
           <label><input type="checkbox" data-layer="grid" checked> Latitude and longitude</label>
-          <p>Dashed borders show approximate extents around 401 BCE. Diamonds mark documented sites and communities. Small circles mark political centers.</p>
+          <p>Political borders show a fixed, approximate snapshot around 401 BCE. Diamonds mark documented sites and communities. Small circles mark political centers.</p>
           <ul class="polity-legend" id="polity-legend" aria-label="Expedition territory colors"></ul>
           <div class="compact-map" aria-label="Route symbols">
             <span><i class="key-stop" aria-hidden="true"></i> Identified stop</span>
             <span><i class="key-estimate" aria-hidden="true"></i> Approximate or disputed</span>
-            <span><i class="key-dashed" aria-hidden="true"></i> Uncertain route leg</span>
+            <span><i class="key-dashed" aria-hidden="true"></i> Uncertain path between stops</span>
           </div>
         </aside>
         <section class="timeline-panel" id="timeline" tabindex="-1" aria-labelledby="timeline-heading" data-stations-expanded="false">
           <div class="timeline-header phone-journey">
+            <button class="phone-intro" id="phone-begin" type="button">
+              <span>Begin the journey</span>
+              <span>Cyrus’s army seeks a way home.</span>
+            </button>
             <button class="phone-scene" id="phone-scene" type="button">
               <span class="phone-thumb"><img id="phone-thumb-image" alt="" width="40" height="40" loading="lazy" decoding="async"></span>
               <span class="phone-scene-title"><span class="phone-stage"></span><span class="phone-place"></span></span>
@@ -129,6 +128,14 @@
           </label>
           <label><input type="checkbox" id="follow-camera" checked> Follow the journey</label>
         </aside>
+        <aside id="world-focus-card" class="world-focus-card" aria-labelledby="world-focus-title" hidden>
+          <h2 id="world-focus-title"></h2>
+          <p></p>
+          <div class="world-entry-actions">
+            <button type="button">Return to route</button>
+            <a>Source</a>
+          </div>
+        </aside>
         <article class="story-panel" id="story-panel" aria-labelledby="stop-title">
           <div id="story-content"></div>
         </article>
@@ -152,6 +159,7 @@
           <div class="note-links">
             <a href="https://www.naturalearthdata.com/about/terms-of-use/">Basemap</a>
             <a href="https://doi.org/10.1017/S0066154623000054">Theches study</a>
+            <a href="https://www.cambridge.org/core/journals/greece-and-rome/article/abs/did-the-mossynoikoi-whistle-a-consideration-of-the-distance-between-poleis-in-the-black-sea-mountains-given-at-anabasis-5431/D5C9A177FB6C666475EF45EEA16393ED">Chronology</a>
           </div>
         </article>
         <article id="world-notes">

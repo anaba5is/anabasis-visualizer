@@ -2,6 +2,8 @@ const RADIANS = Math.PI / 180;
 // Natural Earth shaded relief and physical vectors, public domain. The global
 // texture uses 1:50m data. The regional texture uses 1:10m data at native relief
 // resolution, with a finer shoreline mask in the alpha channel.
+const smallScreen = globalThis.matchMedia?.('(max-width: 52rem)').matches;
+const COMPACT_TEXTURE_URL = new URL('./assets/globe-relief-compact.webp', import.meta.url).href;
 const TEXTURE_URL = new URL('./assets/globe-relief.webp', import.meta.url).href;
 const REGIONAL_TEXTURE_URL = new URL('./assets/globe-detail.webp', import.meta.url).href;
 // West, south, east, north. This is the crop in scripts/build-globe-detail.py.
@@ -608,7 +610,7 @@ export function createGlobe(canvas) {
       resolve(true);
     };
     image.onerror = () => resolve(false);
-    image.src = TEXTURE_URL;
+    image.src = smallScreen ? COMPACT_TEXTURE_URL : TEXTURE_URL;
   });
 
   return { draw, project, ready };

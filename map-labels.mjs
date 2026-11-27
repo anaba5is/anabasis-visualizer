@@ -1,6 +1,6 @@
 import { firstAvailableLabel } from './label-geometry.mjs';
 
-const defaultStopOffsets = [[13, 4, 'start'], [-13, 4, 'end'], [0, -15, 'middle'], [0, 24, 'middle']];
+const defaultStopOffsets = [[13, 4, 'start'], [-13, 4, 'end'], [0, -15, 'middle'], [0, 24, 'middle'], [0, -31, 'middle'], [0, 38, 'middle']];
 
 export function createMapLabels(stops, stopNodes, places, stopLayouts) {
   const measurements = new Map();
@@ -31,13 +31,13 @@ export function createMapLabels(stops, stopNodes, places, stopLayouts) {
     measurements.clear();
   }
 
-  function drawStops(view, positions, selectedIndex, layers) {
+  function drawStops(view, positions, selectedIndex, layers, pins) {
     if (view.width !== viewportWidth) {
       viewportWidth = view.width;
       clearMetrics();
     }
 
-    const occupied = [];
+    const occupied = [...pins];
     let selectedBox;
     const order = [selectedIndex, ...stops.keys()].filter((index, position) => position === 0 || index !== selectedIndex);
     for (const index of order) {
@@ -56,7 +56,7 @@ export function createMapLabels(stops, stopNodes, places, stopLayouts) {
       const label = place(node, point, [preferred, ...defaultStopOffsets], view.labelBounds, occupied);
       if (isSelected) selectedBox = label;
     }
-    return { occupied, selectedBox };
+    return { occupied: occupied.slice(pins.length), selectedBox };
   }
 
   function drawPlaces(view, occupied, showPlaces) {

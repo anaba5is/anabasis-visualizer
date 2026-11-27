@@ -1,5 +1,5 @@
-import { politicalRegions, administrations } from './historical-data.mjs?v=6';
-import { createProjector } from './globe.mjs?v=8';
+import { politicalRegions, administrations } from './historical-data.mjs';
+import { createProjector } from './globe.mjs';
 import { labelBox, labelFits } from './label-geometry.mjs';
 
 const NS = 'http://www.w3.org/2000/svg';

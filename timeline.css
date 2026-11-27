@@ -16,6 +16,12 @@
   padding: .12rem .22rem .18rem;
 }
 
+/* Fit the full journey on desktop. The shorter phone dock retains a scrollable rail. */
+@media (min-width: 52.01rem) and (min-height: 30.01rem), (min-width: 70.01rem) {
+  .route-timeline__stage { min-width: 0; }
+  .route-timeline__name { overflow-wrap: anywhere; }
+}
+
 .route-timeline__books,
 .route-timeline__track {
   display: grid;
