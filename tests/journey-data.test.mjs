@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { stops } from '../story.mjs';
 import { scenes } from '../scenes.mjs';
 import { captions } from '../captions.mjs';
+import { expeditionContext, sceneContext } from '../scene-context.mjs';
 import { readAtlasLocation, writeAtlasLocation } from '../atlas-location.mjs';
 import { createMapLabels } from '../map-labels.mjs';
 
@@ -15,6 +16,25 @@ test('every stop has a date label, a scene, and its local image', () => {
   for (const { id, date } of stops) {
     assert.match(date, /BCE$/);
     assert(existsSync(new URL('../assets/' + scenes[id].file, import.meta.url)), id);
+  }
+});
+
+test('historical context and artwork link to their source', () => {
+  const ids = new Set(stops.map(stop => stop.id));
+  for (const id of Object.keys(sceneContext)) assert(ids.has(id), id);
+  for (const entry of [expeditionContext, ...Object.values(sceneContext)]) {
+    assert(entry.title && entry.text && entry.sourceLabel);
+    assert.equal(new URL(entry.source).protocol, 'https:');
+  }
+
+  for (const [id, scene] of Object.entries(scenes)) {
+    assert(scene.alt && scene.caption && scene.credit, id);
+    assert.equal(new URL(scene.source).protocol, 'https:', id);
+    assert.equal(new URL(scene.licenseUrl).protocol, 'https:', id);
+    if (scene.imageKind) assert(scene.objectDate, id);
+    for (const variant of ['card-', 'thumb-']) {
+      assert(existsSync(new URL('../assets/previews/' + variant + scene.file, import.meta.url)), id);
+    }
   }
 });
 
