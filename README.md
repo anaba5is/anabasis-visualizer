@@ -47,7 +47,7 @@ The tests cover label geometry and pin clearance, playback, bookmarks, and journ
 Use 1024 × 768 and 1440 × 900 for desktop, then 390 × 844 and 568 × 320 for the phone layouts.
 
 1. Start at the root URL. Confirm the introduction and globe appear. On phones the introduction lives in the dock.
-2. Choose **Begin the journey**. On desktop verify Book VII and Pergamum are already in view, then arrow through the stops and use End. On phones expand **Stops** and use the scrubber.
+2. Choose **Begin the journey**. On desktop verify Book VII, Pergamum, and the scrubber fit inside the dock, then arrow through the stops and use End. Check that North sits beside the distance scale below the map toolbar. On phones expand **Stops** and use the scrubber.
 3. At Pergamum open **Read scene**. Check that the artwork precedes the story, **Backstory** starts folded, and Close restores focus. On desktop, choose a distant stop and zoom in with the reader open. Its selected pin should stay in the clear area beside the panel. On phones confirm a modal sheet. At Theches open **Passages & image credit** and check the location study link.
 4. In **Layers** rotate to East and Inner Asia. From the world index jump to Monte Albán. Reload its bookmark, check the world card and highlight, and use **Return to route**.
 5. With a phone-sized viewport and a fresh reload, check the network panel for `globe-relief-compact.webp`. Switch to Route to check that `map-geometry.mjs` loads. Check the console in both views.

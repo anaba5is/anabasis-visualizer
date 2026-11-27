@@ -299,7 +299,6 @@ button:focus-visible, a:focus-visible, summary:focus-visible, section:focus-visi
 .map-mode button + button { border-left: 1px solid #c4b294; }
 .map-mode button[aria-pressed="true"], .map-mode #scene-toggle[aria-expanded="true"] { background: #273c39; color: #fff5e4; }
 .map-mode button:hover { box-shadow: inset 0 0 0 1px #a16d57; }
-.map-key .globe-tip { margin-left: auto; }
 .atlas-window.scene-hidden { grid-template-columns: minmax(0, 1fr); grid-template-areas: "map" "timeline"; }
 .story-nav #play-route { color: var(--rust); }
 .scene .contain { background: #ded1bb; }
@@ -315,7 +314,6 @@ button:focus-visible, a:focus-visible, summary:focus-visible, section:focus-visi
   .wide-button-text { display: none; }
   .map-mode { top: .45rem; left: .45rem; }
   .map-mode button { font-size: .78rem; padding: .34rem .49rem; }
-  .map-key .globe-tip { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

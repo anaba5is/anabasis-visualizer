@@ -16,12 +16,6 @@
   padding: .12rem .22rem .18rem;
 }
 
-/* Fit the full journey on desktop. The shorter phone dock retains a scrollable rail. */
-@media (min-width: 52.01rem) and (min-height: 30.01rem), (min-width: 70.01rem) {
-  .route-timeline__stage { min-width: 0; }
-  .route-timeline__name { overflow-wrap: anywhere; }
-}
-
 .route-timeline__books,
 .route-timeline__track {
   display: grid;
@@ -188,6 +182,17 @@
   outline: 2px solid var(--rust, #8a402d);
   outline-offset: 1px;
   border-radius: .2rem;
+}
+
+/* Fit the full journey on desktop. The shorter phone dock retains a scrollable rail. */
+@media (min-width: 52.01rem) and (min-height: 30.01rem), (min-width: 70.01rem) {
+  .route-timeline__stage { min-width: 0; padding-block: .06rem 0; }
+  .route-timeline__books { margin-bottom: .11rem; }
+  .route-timeline__book { padding-block: .13rem; }
+  .route-timeline__track { --station-axis: .56rem; }
+  .route-timeline__stop { padding-block: .17rem; }
+  .route-timeline__name { margin-top: calc(var(--station-axis) + .23rem); overflow-wrap: anywhere; }
+  .route-timeline__scrubber { font-size: .65rem; }
 }
 
 @media (min-width: 52.01rem) and (max-width: 70rem) and (min-height: 30.01rem) {

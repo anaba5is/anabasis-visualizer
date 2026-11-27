@@ -38,30 +38,34 @@
           <div class="map-frame" tabindex="0" role="region" aria-label="Rotatable globe" aria-describedby="globe-instructions">
             <canvas id="globe-canvas" aria-hidden="true"></canvas>
             <svg id="expedition-map" role="group" aria-label="Interactive map of Xenophon’s expedition" aria-describedby="map-instructions" xmlns="http://www.w3.org/2000/svg"></svg>
-            <div class="map-controls" role="group" aria-label="Map zoom">
-              <button type="button" id="zoom-in" aria-label="Zoom in" title="Zoom in">+</button>
-              <button type="button" id="zoom-out" aria-label="Zoom out" title="Zoom out">−</button>
-              <button type="button" id="zoom-reset" aria-label="Reset route view" title="Reset route view">⌂</button>
-              <button type="button" id="fullscreen-toggle" aria-label="Enter fullscreen" title="Enter fullscreen" hidden>⛶</button>
+            <div class="map-toolbar">
+              <div class="map-mode" role="group" aria-label="Globe views">
+                <button type="button" id="view-route" aria-pressed="false">Route</button>
+                <button type="button" id="view-globe" aria-pressed="true">Globe</button>
+                <button type="button" id="scene-toggle" aria-controls="story-panel" aria-expanded="true">Scene</button>
+                <button type="button" id="layers-toggle" aria-controls="layers-panel" aria-expanded="false">Layers</button>
+              </div>
+              <div class="map-controls" role="group" aria-label="Map zoom">
+                <button type="button" id="zoom-in" aria-label="Zoom in" title="Zoom in">+</button>
+                <button type="button" id="zoom-out" aria-label="Zoom out" title="Zoom out">−</button>
+                <button type="button" id="zoom-reset" aria-label="Reset route view" title="Reset route view">⌂</button>
+                <button type="button" id="fullscreen-toggle" aria-label="Enter fullscreen" title="Enter fullscreen" hidden>⛶</button>
+              </div>
             </div>
-            <div class="map-mode" role="group" aria-label="Globe views">
-              <button type="button" id="view-route" aria-pressed="false">Route</button>
-              <button type="button" id="view-globe" aria-pressed="true">Globe</button>
-              <button type="button" id="scene-toggle" aria-controls="story-panel" aria-expanded="true">Scene</button>
-              <button type="button" id="layers-toggle" aria-controls="layers-panel" aria-expanded="false">Layers</button>
-            </div>
-            <span class="map-scale" id="map-scale" aria-hidden="true"></span>
-            <span class="map-north" aria-hidden="true">N<span></span></span>
           </div>
           <figure class="sea-moment" id="sea-moment" aria-hidden="true" hidden>
             <blockquote>“The sea! The sea!”</blockquote>
             <figcaption>Xenophon, <i>Anabasis</i> 4.7.24</figcaption>
           </figure>
-          <div class="map-key" id="map-instructions">
-            <span><i class="key-stop" aria-hidden="true"></i> Identified stop</span>
-            <span><i class="key-estimate" aria-hidden="true"></i> Approximate or disputed</span>
-            <span class="globe-tip" id="globe-instructions">Drag to rotate<span class="sr-only">, or use arrow keys when focused</span></span>
+          <div class="map-reference">
+            <span class="map-north" aria-hidden="true">N<span></span></span>
+            <span class="map-scale" id="map-scale" aria-hidden="true"></span>
+            <div class="map-key" id="map-instructions">
+              <span><i class="key-stop" aria-hidden="true"></i> Identified stop</span>
+              <span><i class="key-estimate" aria-hidden="true"></i> Approximate or disputed</span>
+            </div>
           </div>
+          <p class="sr-only" id="globe-instructions">Drag to rotate, or use the arrow keys when the globe is focused.</p>
         </div>
         <section class="journey-intro" id="journey-intro" aria-labelledby="intro-title">
           <p class="intro-period">Xenophon’s <em>Anabasis</em> <span aria-hidden="true">·</span> 401–399 BCE</p>
