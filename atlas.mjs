@@ -571,13 +571,6 @@ function getView() {
   const frame = cameraFrame();
   const readerOpen = sceneReader.isSideOpen() || sceneReader.isHalfSheetOpen();
   const view = { ...frame, ...camera, radius: frame.baseline * camera.scale, focusId: worldFocus?.id, readerOpen };
-  if (readerOpen) {
-    const adjusted = keepPointInFrame(stops[selectedIndex].coords, view);
-    if (adjusted) {
-      Object.assign(camera, adjusted);
-      Object.assign(view, adjusted);
-    }
-  }
   view.locate = createProjector(view);
   return view;
 }
@@ -602,13 +595,15 @@ function draw() {
   drawFrame = undefined;
   const view = getView();
   if (!view.width || !view.height) return;
-  const storyMap = !worldFocus && (mode === 'route' || mode === 'free' || view.readerOpen || (playback.isPlaying() && followControl.checked));
+  const storyMap = !worldFocus && mode === 'route' && view.scale >= .75;
   atlasWindow.classList.toggle('story-map', storyMap);
   view.storyMap = storyMap;
-  const activeQuote = storyMap && !sceneReader.isHalfSheetOpen() ? primaryQuotes[stops[selectedIndex].id] : null;
+  const showQuoteContext = !worldFocus && !sceneReader.isHalfSheetOpen() && mode !== 'globe' && view.scale >= .65;
+  const activeQuote = showQuoteContext ? primaryQuotes[stops[selectedIndex].id] : null;
   const showQuote = Boolean(activeQuote?.mapCallout);
   seaMoment.hidden = !showQuote;
   if (showQuote) {
+    seaMoment.classList.toggle('is-short', activeQuote.text.length <= 24);
     momentQuote.textContent = `“${activeQuote.text}”`;
     momentCite.replaceChildren('Xenophon, ', html('i', '', 'Anabasis'), ` ${activeQuote.cite}`);
   }
@@ -728,7 +723,7 @@ function draw() {
     scaleBar.textContent = `${kilometers} km`;
   }
   zoomOut.disabled = view.scale <= view.world + .005;
-  zoomIn.disabled = view.scale >= 2.8;
+  zoomIn.disabled = view.scale >= 4.15;
 }
 
 function queueDraw() {
@@ -795,7 +790,7 @@ function setMode(nextMode) {
 
 function changeZoom(factor, { animate = true } = {}) {
   setPlaying(false);
-  const scale = clamp(camera.scale * factor, globeScale(), 2.85);
+  const scale = clamp(camera.scale * factor, globeScale(), 4.2);
   setMode('free');
   if (animate) {
     goTo({ ...camera, scale });
@@ -804,6 +799,20 @@ function changeZoom(factor, { animate = true } = {}) {
     camera.scale = scale;
     queueDraw();
   }
+}
+
+function glideGlobe(vLon, vLat) {
+  if (reducedMotion.matches || Math.hypot(vLon, vLat) < .03) return;
+  stopCameraAnimation();
+  const step = () => {
+    vLon *= .9;
+    vLat *= .9;
+    camera.lon = wrapLon(camera.lon + vLon);
+    camera.lat = clamp(camera.lat + vLat, -83, 83);
+    queueDraw();
+    animation = Math.hypot(vLon, vLat) > .02 ? requestAnimationFrame(step) : undefined;
+  };
+  animation = requestAnimationFrame(step);
 }
 
 function touchGap() {
@@ -818,7 +827,11 @@ function startPointer(event) {
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   const gap = touchGap();
   if (pointers.size === 1 || gap) {
-    gesture = { startX: event.clientX, startY: event.clientY, radius: getView().radius, origin: { ...camera }, gap, moved: false };
+    gesture = {
+      startX: event.clientX, startY: event.clientY,
+      lastLon: camera.lon, lastLat: camera.lat, vLon: 0, vLat: 0,
+      radius: getView().radius, origin: { ...camera }, gap, moved: false,
+    };
   }
 }
 
@@ -837,24 +850,36 @@ function movePointer(event) {
     setMode('free');
   }
   if (gap && gesture.gap) {
-    camera.scale = clamp(gesture.origin.scale * gap / gesture.gap, globeScale(), 2.85);
+    camera.scale = clamp(gesture.origin.scale * gap / gesture.gap, globeScale(), 4.2);
   } else if (!gesture.gap) {
     const degreesPerPixel = 57.296 / gesture.radius;
-    camera.lon = wrapLon(gesture.origin.lon - dx * degreesPerPixel / Math.max(.4, Math.cos(camera.lat * Math.PI / 180)));
-    camera.lat = clamp(gesture.origin.lat + dy * degreesPerPixel, -83, 83);
+    const nextLon = wrapLon(gesture.origin.lon - dx * degreesPerPixel / Math.max(.4, Math.cos(camera.lat * Math.PI / 180)));
+    const nextLat = clamp(gesture.origin.lat + dy * degreesPerPixel, -83, 83);
+    gesture.vLon = wrapLon(nextLon - gesture.lastLon);
+    gesture.vLat = nextLat - gesture.lastLat;
+    gesture.lastLon = nextLon;
+    gesture.lastLat = nextLat;
+    camera.lon = nextLon;
+    camera.lat = nextLat;
   }
   queueDraw();
 }
 
 function endPointer(event) {
   if (!pointers.delete(event.pointerId)) return;
-  if (gesture?.moved) suppressClickUntil = performance.now() + 250;
+  const done = gesture;
+  if (done?.moved) suppressClickUntil = performance.now() + 250;
   if (pointers.size) {
     const [remaining] = pointers.values();
-    gesture = { startX: remaining.x, startY: remaining.y, radius: getView().radius, origin: { ...camera }, gap: 0, moved: true };
+    gesture = {
+      startX: remaining.x, startY: remaining.y,
+      lastLon: camera.lon, lastLat: camera.lat, vLon: 0, vLat: 0,
+      radius: getView().radius, origin: { ...camera }, gap: 0, moved: true,
+    };
   } else {
     gesture = undefined;
     mapFrame.classList.remove('dragging');
+    if (done?.moved && !done.gap) glideGlobe(clamp(done.vLon, -4, 4), clamp(done.vLat, -3, 3));
   }
 }
 
@@ -889,7 +914,12 @@ function selectFromHash() {
 
 surface = createGlobe(find('#globe-canvas'));
 setupBase();
-drawHistoricalLayer = addHistoricalLayer(map);
+drawHistoricalLayer = addHistoricalLayer(map, {
+  onSelectWorldSite(id) {
+    if (performance.now() < suppressClickUntil) return;
+    worldPanel?.selectById(id);
+  },
+});
 setupRoute();
 setupMarkers();
 worldFocusMarker = svg('g', { class: 'world-focus-marker', visibility: 'hidden', 'aria-hidden': 'true' });
@@ -941,6 +971,14 @@ const sceneReader = createSceneReader(readerDialog, {
     atlasWindow.classList.toggle('scene-reading', sideOpen);
     atlasWindow.classList.toggle('sheet-reading', Boolean(halfSheet));
     storyPanel.inert = sideOpen;
+    frameBounds = undefined;
+    if (sideOpen || halfSheet) {
+      const frame = cameraFrame();
+      const adjusted = keepPointInFrame(stops[selectedIndex].coords, {
+        ...frame, ...camera, radius: frame.baseline * camera.scale,
+      });
+      if (adjusted) Object.assign(camera, adjusted);
+    }
     resizeMap();
   },
   fallbackFocus() {
@@ -1050,9 +1088,20 @@ window.addEventListener('pointercancel', endPointer);
 mapFrame.addEventListener('keydown', keyboardGlobe);
 mapFrame.addEventListener('wheel', event => {
   event.preventDefault();
-  const sensitivity = event.deltaMode ? .05 : .0025;
-  const factor = Math.exp(clamp(-event.deltaY * sensitivity, -.45, .45));
-  changeZoom(factor, { animate: false });
+  const isZoom = event.ctrlKey || event.deltaMode !== 0 || (event.deltaX === 0 && Math.abs(event.deltaY) >= 48);
+  if (isZoom) {
+    const sensitivity = event.deltaMode ? .05 : event.ctrlKey ? .008 : .0025;
+    const factor = Math.exp(clamp(-event.deltaY * sensitivity, -.45, .45));
+    changeZoom(factor, { animate: false });
+    return;
+  }
+  setPlaying(false);
+  stopCameraAnimation();
+  setMode('free');
+  const degreesPerPixel = 57.296 / getView().radius;
+  camera.lon = wrapLon(camera.lon + event.deltaX * degreesPerPixel / Math.max(.4, Math.cos(camera.lat * Math.PI / 180)));
+  camera.lat = clamp(camera.lat - event.deltaY * degreesPerPixel, -83, 83);
+  queueDraw();
 }, { passive: false });
 navSources.addEventListener('click', event => {
   event.preventDefault();

@@ -170,7 +170,7 @@ function possiblyVisible(shape, view) {
     && center.y + reach >= 0 && center.y - reach <= view.height;
 }
 
-export function addHistoricalLayer(map) {
+export function addHistoricalLayer(map, { onSelectWorldSite } = {}) {
   const holder = element('g', 'historical-layer');
   holder.setAttribute('aria-hidden', 'true');
   const territories = element('g', 'political-territories');
@@ -233,10 +233,21 @@ export function addHistoricalLayer(map) {
       group.append(marker);
     }
     if (isWorldSite) {
+      const hit = element('circle', 'world-site-hit');
+      hit.setAttribute('r', '10');
       const marker = element(kind === 'polity' ? 'circle' : 'path', 'world-site-point');
-      if (kind === 'polity') marker.setAttribute('r', '3.4');
-      else marker.setAttribute('d', 'M0 -4L4 0L0 4L-4 0Z');
-      group.append(marker);
+      if (kind === 'polity') marker.setAttribute('r', '3.6');
+      else marker.setAttribute('d', 'M0 -4.2L4.2 0L0 4.2L-4.2 0Z');
+      const tip = element('title', '', `${administration.name}: ${administration.note ?? ''}`);
+      group.append(tip, hit, marker);
+      if (onSelectWorldSite) {
+        const select = event => {
+          event.stopPropagation();
+          onSelectWorldSite(id);
+        };
+        hit.addEventListener('click', select);
+        marker.addEventListener('click', select);
+      }
     }
     const name = element('text', 'administration-name', administration.name);
     group.append(name);
@@ -337,7 +348,7 @@ export function addHistoricalLayer(map) {
         group.setAttribute('transform', `translate(${round(point.x)} ${round(point.y)})`);
         const suppressedByStop = Boolean(stopId && visibleStopIds?.has(stopId));
         const labelVisible = !suppressedByStop && layers.places !== false
-          && (!isWorldSite || (!view.storyMap && (overview || view.scale > .34 || id === view.focusId)));
+          && (!isWorldSite || overview || view.scale > .25 || id === view.focusId);
         if (labelVisible) {
           const candidate = hasMarker
             ? labelBesideMarker(point, width, bounds, occupied) : centeredLabel(point, width, bounds, 3, 24);

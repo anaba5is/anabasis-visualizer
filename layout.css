@@ -1511,24 +1511,28 @@ details[open] > .reader-note-summary .reader-note-caret::before { content: '▾'
   z-index: 2;
   left: var(--atlas-left);
   bottom: calc(var(--atlas-above-dock) + 10.1rem);
-  max-width: min(29rem, calc(100vw - var(--atlas-story-width, 24rem) - 4rem));
+  max-width: min(21rem, calc(100vw - var(--atlas-story-width, 24rem) - 4rem));
   margin: 0;
-  padding: .42rem .75rem;
+  padding: .34rem .62rem;
   border-inline-start: 2px solid #e2c78f;
-  border-radius: 0 .45rem .45rem 0;
+  border-radius: 0 .42rem .42rem 0;
   color: #fff1d1;
-  background: linear-gradient(90deg, #152826f0, #152826b8 82%, transparent);
+  background: linear-gradient(90deg, rgb(20 39 37 / .88), rgb(20 39 37 / .68) 84%, transparent);
+  backdrop-filter: blur(8px);
   pointer-events: none;
 }
 .sea-moment blockquote {
   margin: 0;
-  font: 400 clamp(1.06rem, 1.85vw, 1.58rem)/1.24 var(--display);
+  font: 400 clamp(.82rem, 1.04vw, .96rem)/1.38 var(--display);
   text-wrap: pretty;
 }
+.sea-moment.is-short blockquote {
+  font: 400 clamp(1.06rem, 1.55vw, 1.42rem)/1.22 var(--display);
+}
 .sea-moment figcaption {
-  margin-top: .18rem;
-  color: #f4dfb7;
-  font-size: .68rem;
+  margin-top: .16rem;
+  color: #e9d2a8;
+  font-size: .64rem;
 }
 @media (max-width: 52rem), (max-width: 70rem) and (max-height: 30rem) {
   .sea-moment {
@@ -1590,7 +1594,7 @@ details[open] > .reader-note-summary .reader-note-caret::before { content: '▾'
 }
 .reader-quote p {
   margin: 0;
-  font: 400 .93rem/1.38 var(--display);
+  font: 400 .84rem/1.42 var(--display);
 }
 .reader-quote cite {
   display: block;

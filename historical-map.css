@@ -74,6 +74,13 @@
   stroke: #183337;
   stroke-width: 1.4px;
   vector-effect: non-scaling-stroke;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.historical-layer .world-site-hit {
+  fill: transparent;
+  pointer-events: auto;
+  cursor: pointer;
 }
 .historical-layer .community .world-site-point { fill: #9bd0b4; }
 .historical-layer .polity .world-site-point { fill: #f5dca8; stroke-width: 1.8px; }
@@ -135,7 +142,6 @@
   .world-focus-card { left: var(--atlas-left); width: auto; }
 }
 
-.story-map .historical-layer .polity-fill { fill-opacity: .16; }
-.story-map .historical-layer :is(.polity-outline, .polity-casing) { opacity: .54; }
-.story-map .historical-layer .world-map-sites { opacity: .24; }
-.story-map .historical-layer .world-map-sites .administration-name { display: none; }
+.story-map .historical-layer .polity-fill { fill-opacity: .26; }
+.story-map .historical-layer :is(.polity-outline, .polity-casing) { opacity: .68; }
+.story-map .historical-layer .world-map-sites { opacity: .85; }

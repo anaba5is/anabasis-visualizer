@@ -8,8 +8,8 @@ const TEXTURE_URL = new URL('./assets/globe-relief.webp', import.meta.url).href;
 const REGIONAL_TEXTURE_URL = new URL('./assets/globe-detail.webp', import.meta.url).href;
 // West, south, east, north. This is the crop in scripts/build-globe-detail.py.
 const REGIONAL_BOUNDS = [20, 25, 52, 47];
-const DETAIL_MIN_RADIUS = 450;
-const DETAIL_FULL_RADIUS = 1000;
+const DETAIL_MIN_RADIUS = 340;
+const DETAIL_FULL_RADIUS = 740;
 const DETAIL_BLEND_DEGREES = 2.2;
 const HALO_RATIO = .085;
 const HALO_PIXELS = 36;
@@ -188,14 +188,28 @@ void main() {
 
   float illumination = max(0.0, dot(normal, incidentLight));
   float gray = terrainEnabled && sampleColor.a > 0.0 ? sampleColor.r / sampleColor.a : 206.0 / 255.0;
-  float landTone = clamp(0.50 + (gray - 0.78) * 2.55, 0.0, 1.0);
+  if (terrainEnabled && sampleColor.a > 0.35) {
+    vec2 stepUv = vec2(1.0 / 4096.0, 1.0 / 2048.0);
+    vec4 n1 = texture2D(earth, uv + vec2(stepUv.x, 0.0));
+    vec4 n2 = texture2D(earth, uv - vec2(stepUv.x, 0.0));
+    vec4 n3 = texture2D(earth, uv + vec2(0.0, stepUv.y));
+    vec4 n4 = texture2D(earth, uv - vec2(0.0, stepUv.y));
+    float aSum = n1.a + n2.a + n3.a + n4.a;
+    if (aSum > 1.8) {
+      float blurGray = (n1.r + n2.r + n3.r + n4.r) / aSum;
+      float sharp = 0.65 * (1.0 - detailZoom * 0.65);
+      gray = clamp(gray + (gray - blurGray) * sharp, 0.0, 1.0);
+    }
+  }
+  float landMask = smoothstep(0.28, 0.72, sampleColor.a);
+  float landTone = clamp(0.50 + (gray - 0.78) * 2.75, 0.0, 1.0);
   vec3 stone = ${shaderColor(SHADE.land)} + landTone * ${shaderColor(SHADE.landLight)};
   float glint = illumination * illumination;
   vec3 ocean = ${shaderColor(SHADE.ocean)} + z * ${shaderColor(SHADE.oceanCenter)}
     + glint * glint * ${shaderColor(SHADE.oceanLight)};
-  vec3 surface = mix(ocean, stone, sampleColor.a) * (0.79 + 0.25 * illumination);
+  vec3 surface = mix(ocean, stone, landMask) * (0.80 + 0.24 * illumination);
 
-  vec3 color = mix(surface, sky, 0.40 * pow(1.0 - z, 3.1));
+  vec3 color = mix(surface, sky, 0.26 * pow(1.0 - z, 3.4));
   float coverage = 1.0 - 0.70 * smoothstep(1.0 - softness, 1.0, edge);
   gl_FragColor = vec4(color * coverage, coverage);
 }`;
@@ -252,6 +266,10 @@ function createWebGLRenderer(canvas) {
   if (!(attributes?.alpha && attributes.premultipliedAlpha)) return null;
 
   const explicitGradient = gl.getExtension('OES_standard_derivatives') && gl.getExtension('EXT_shader_texture_lod');
+  const aniso = gl.getExtension('EXT_texture_filter_anisotropic')
+    || gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic')
+    || gl.getExtension('MOZ_EXT_texture_filter_anisotropic');
+  const maxAniso = aniso ? Math.min(16, gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)) : 0;
   const extensions = explicitGradient ? `#extension GL_OES_standard_derivatives : enable
 #extension GL_EXT_shader_texture_lod : enable
 #define EXPLICIT_GRADIENT 1
@@ -321,11 +339,13 @@ function createWebGLRenderer(canvas) {
         gl.generateMipmap(gl.TEXTURE_2D);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
       }
+      if (aniso && maxAniso > 1) gl.texParameterf(gl.TEXTURE_2D, aniso.TEXTURE_MAX_ANISOTROPY_EXT, maxAniso);
     },
     setRegionalImage(image) {
       if (gl.isContextLost()) return;
       gl.activeTexture(gl.TEXTURE1);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, fitImage(image, maxTextureSize));
+      if (aniso && maxAniso > 1) gl.texParameterf(gl.TEXTURE_2D, aniso.TEXTURE_MAX_ANISOTROPY_EXT, maxAniso);
       gl.activeTexture(gl.TEXTURE0);
       gl.uniform1i(uniforms.regionalLoaded, 1);
     },

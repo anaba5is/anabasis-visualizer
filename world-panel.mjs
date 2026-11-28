@@ -69,5 +69,12 @@ export function connectWorldPanel({ onLayerReady, onFocus, onBrowse, onReturn })
   });
 
   if (readAtlasLocation(location.hash)?.type === 'world') syncFromHash();
-  return { syncFromHash, hide: () => { panel.hidden = true; } };
+  return {
+    syncFromHash,
+    hide: () => { panel.hidden = true; },
+    selectById(id) {
+      const entry = entriesById.get(id);
+      if (entry) activate(entry, 'place');
+    },
+  };
 }
