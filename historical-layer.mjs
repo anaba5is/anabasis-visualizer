@@ -193,6 +193,13 @@ export function addHistoricalLayer(map, { onSelectWorldSite } = {}) {
     const outline = element('use', 'polity-outline');
     outline.setAttribute('href', `#${boundary.id}`);
     const fill = element('path', 'polity-fill');
+    fill.append(element('title', '', `${region.name}: ${region.note ?? ''}`));
+    if (onSelectWorldSite) {
+      fill.addEventListener('click', event => {
+        event.stopPropagation();
+        onSelectWorldSite(region.id);
+      });
+    }
     shape.style.setProperty('--polity-color', region.color);
     shape.style.setProperty('--polity-fill', region.fillColor ?? region.color);
     shape.style.setProperty('--polity-fill-opacity', region.fillOpacity ?? .32);

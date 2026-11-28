@@ -1741,3 +1741,162 @@ details[open] > .reader-note-summary .reader-note-caret::before { content: '▾'
 @media (max-width: 52rem), (max-width: 70rem) and (max-height: 30rem) {
   .phone-stage { font-size: .58rem; letter-spacing: .01em; }
 }
+
+/* Sea legs, route arrows, key figures, copy-link, and landmark cards */
+
+.route-path.sea-leg {
+  stroke-dasharray: 8 4 2 4;
+}
+.route-shadow.sea-leg {
+  stroke-dasharray: 8 4 2 4;
+}
+.route-arrow {
+  fill: none;
+  stroke: var(--phase, #f1b66f);
+  stroke-width: 1.9px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 2px #142220);
+  pointer-events: none;
+  opacity: .92;
+}
+.compact-map .key-sea {
+  display: inline-block;
+  width: .85rem;
+  margin-right: .27rem;
+  border-top: 2px dotted #92e4d6;
+  vertical-align: middle;
+}
+
+.route-landmark { cursor: pointer; pointer-events: auto; }
+.landmark-hit { fill: transparent; pointer-events: auto; }
+.route-landmark:hover .landmark-dot { fill: #f1dec0; stroke: #182624; }
+
+.landmark-card {
+  position: fixed;
+  z-index: 7;
+  left: var(--atlas-left);
+  top: calc(var(--atlas-top) + var(--atlas-header) + 3.1rem);
+  width: min(17.5rem, calc(100vw - 1.4rem));
+  padding: .58rem .72rem;
+  border: 1px solid var(--glass-edge);
+  border-radius: .72rem;
+  background: var(--glass-raised);
+  color: #f8eed9;
+  box-shadow: var(--glass-rim), var(--glass-depth);
+  backdrop-filter: var(--glass-filter);
+}
+.landmark-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .5rem;
+}
+.landmark-card h2 { margin: 0; font: 400 1.1rem/1.15 var(--display); }
+.landmark-card-head button {
+  border: 0;
+  background: transparent;
+  color: #e5d2b2;
+  font-size: 1.05rem;
+  cursor: pointer;
+  padding: 0 .25rem;
+}
+.landmark-card p { margin: .28rem 0 .35rem; font-size: .75rem; line-height: 1.38; color: #eadbc2; }
+.landmark-card a { color: #f1d3a2; font-size: .74rem; font-weight: 600; }
+
+.reader-figures {
+  margin-top: .65rem;
+  padding-top: .52rem;
+  border-top: 1px solid #e2d5bf;
+}
+.figures-heading {
+  display: block;
+  margin-bottom: .32rem;
+  color: #725138;
+  font-size: .68rem;
+  font-weight: 680;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.figure-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+}
+.figure-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .32rem;
+  min-height: 1.72rem;
+  padding: .14rem .5rem;
+  border: 1px solid #d5c3a7;
+  border-radius: 999px;
+  background: #f5ecdc;
+  color: #3f3124;
+  font-size: .72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.figure-chip:hover { background: #ecdec6; }
+.figure-chip[aria-pressed="true"] {
+  background: #273e3a;
+  border-color: #273e3a;
+  color: #fff4df;
+}
+.figure-dot {
+  width: .42rem;
+  height: .42rem;
+  border-radius: 50%;
+  background: #8a5a3a;
+}
+.faction-persian .figure-dot { background: #2c7f99; }
+.faction-greek .figure-dot { background: #b27036; }
+.faction-spartan .figure-dot { background: #96413b; }
+.faction-thracian .figure-dot { background: #8c4d73; }
+.figure-bio {
+  margin-top: .45rem;
+  padding: .5rem .62rem;
+  border: 1px solid #dccbb0;
+  border-radius: .5rem;
+  background: #f3e9d8;
+  font-size: .76rem;
+  line-height: 1.42;
+}
+.figure-bio-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .25rem .45rem;
+  margin-bottom: .24rem;
+}
+.figure-role { color: #6e5741; font-size: .7rem; }
+.figure-bio p { margin: 0 0 .32rem; }
+.figure-stops {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .24rem;
+  margin-bottom: .28rem;
+}
+.figure-stops-label { color: #6e5741; font-size: .68rem; font-weight: 620; }
+.figure-stop-link {
+  padding: .08rem .38rem;
+  border: 1px solid #cbb799;
+  border-radius: 999px;
+  background: #faf3e6;
+  color: #5b3c25;
+  font-size: .66rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.figure-stop-link.is-here {
+  background: #8a402d;
+  border-color: #8a402d;
+  color: #fff6e8;
+}
+.figure-bio a { color: #724024; font-size: .72rem; font-weight: 620; }
+
+.copy-link-btn {
+  font-size: .73rem !important;
+  font-weight: 600;
+}

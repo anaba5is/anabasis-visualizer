@@ -50,7 +50,17 @@ export function connectWorldPanel({ onLayerReady, onFocus, onBrowse, onReturn })
   });
 
   document.querySelector('#open-world-index').addEventListener('click', onBrowse);
-  panel.querySelector('button').addEventListener('click', onReturn);
+  panel.querySelector('#world-return').addEventListener('click', onReturn);
+  const copyBtn = panel.querySelector('#world-copy-link');
+  copyBtn?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard?.writeText(location.href);
+      copyBtn.textContent = 'Copied';
+      setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 1500);
+    } catch {
+      copyBtn.textContent = 'Copy link';
+    }
+  });
 
   import('./world-history.mjs').then(({ worldRegions, worldSiteRecords }) => {
     const expeditionPolities = politicalRegions.map(region => ({

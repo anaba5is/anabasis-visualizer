@@ -10,12 +10,12 @@
   <link rel="preload" href="./assets/fonts/gfs-didot-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="./assets/globe-relief-compact.webp" as="image" fetchpriority="high" media="(max-width: 52rem)">
   <link rel="preload" href="./assets/globe-relief.webp" as="image" fetchpriority="high" media="(min-width: 52.001rem)">
-  <link rel="stylesheet" href="./styles.css?v=storytelling-v4">
-  <link rel="stylesheet" href="./timeline.css?v=storytelling-v4">
-  <link rel="stylesheet" href="./layout.css?v=storytelling-v4">
-  <link rel="stylesheet" href="./historical-map.css?v=storytelling-v4">
-  <link rel="stylesheet" href="./typography.css?v=storytelling-v4">
-  <script type="module" src="./atlas.mjs?v=storytelling-v5"></script>
+  <link rel="stylesheet" href="./styles.css?v=storytelling-v6">
+  <link rel="stylesheet" href="./timeline.css?v=storytelling-v6">
+  <link rel="stylesheet" href="./layout.css?v=storytelling-v6">
+  <link rel="stylesheet" href="./historical-map.css?v=storytelling-v6">
+  <link rel="stylesheet" href="./typography.css?v=storytelling-v6">
+  <script type="module" src="./atlas.mjs?v=storytelling-v6"></script>
 </head>
 <body>
   <a class="skip-link" href="#timeline">Skip to the timeline</a>
@@ -102,6 +102,7 @@
             <span><i class="key-stop" aria-hidden="true"></i> Identified stop</span>
             <span><i class="key-estimate" aria-hidden="true"></i> Approximate or disputed</span>
             <span><i class="key-dashed" aria-hidden="true"></i> Uncertain path between stops</span>
+            <span><i class="key-sea" aria-hidden="true"></i> Sea passage / strait crossing</span>
           </div>
         </aside>
         <section class="timeline-panel" id="timeline" tabindex="-1" aria-labelledby="timeline-heading" data-stations-expanded="false">
@@ -133,9 +134,18 @@
           <h2 id="world-focus-title"></h2>
           <p></p>
           <div class="world-entry-actions">
-            <button type="button">Return to route</button>
+            <button type="button" id="world-return">Return to route</button>
+            <button type="button" id="world-copy-link" class="copy-link-btn">Copy link</button>
             <a>Source</a>
           </div>
+        </aside>
+        <aside id="landmark-card" class="landmark-card" aria-labelledby="landmark-card-title" hidden>
+          <div class="landmark-card-head">
+            <h2 id="landmark-card-title"></h2>
+            <button type="button" id="landmark-card-close" aria-label="Close landmark">×</button>
+          </div>
+          <p id="landmark-card-note"></p>
+          <a id="landmark-card-link" target="_blank" rel="noopener">Read passage</a>
         </aside>
         <article class="story-panel" id="story-panel" aria-labelledby="stop-title">
           <div id="story-content"></div>
@@ -186,8 +196,8 @@
           <div class="note-links" id="historical-links"><a href="https://github.com/anaba5is/anabasis-visualizer/blob/main/historical-sources.md">Territories and places</a></div>
         </article>
         <article>
-          <h2>Earlier maps</h2>
-          <p>Explore two projects that also mapped Xenophon’s account.</p>
+          <h2>Earlier maps &amp; shortcuts</h2>
+          <p>Explore two projects that also mapped Xenophon’s account. Keyboard: <strong>Space</strong> play/pause, <strong>[</strong> / <strong>]</strong> stops, <strong>R</strong> route, <strong>G</strong> globe, <strong>S</strong> reader.</p>
           <div class="note-links">
             <a href="https://agesofeurope.eu/chapter-09-xenophon">Campaign Atlas</a>
             <a href="https://ciancolgan.com/ten/thousand.html">Tracking the Ten Thousand</a>
@@ -205,6 +215,7 @@
       </div>
       <div class="scene-reader-actions">
         <button type="button" id="reader-expand" class="reader-expand" aria-pressed="false" hidden>Full view</button>
+        <button type="button" id="reader-copy-link" class="copy-link-btn" title="Copy direct link to this stop">Link</button>
         <nav aria-label="Read adjacent scenes">
           <button type="button" id="reader-previous" aria-label="Previous scene">‹</button>
           <button type="button" id="reader-next" aria-label="Next scene">›</button>

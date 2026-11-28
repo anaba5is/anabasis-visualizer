@@ -4,6 +4,7 @@ import { html, link } from './dom.mjs';
 import { expeditionContext, sceneContext } from './scene-context.mjs';
 import { placeAndBook, formatStopDate } from './journey-format.mjs';
 import { primaryQuotes, stopMetrics } from './expedition-metrics.mjs';
+import { figures, stopFigures } from './expedition-figures.mjs';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MAX_ELEVATION = 2300;
@@ -124,6 +125,56 @@ function buildElevationCard(activeIndex, select) {
   return card;
 }
 
+function buildFiguresSection(stopId, select) {
+  const ids = stopFigures[stopId];
+  if (!ids?.length) return null;
+
+  const section = html('div', 'reader-figures');
+  const heading = html('span', 'figures-heading', 'Key figures');
+  const chips = html('div', 'figure-chips');
+  const detail = html('div', 'figure-bio');
+  detail.hidden = true;
+  let openId = null;
+
+  const buttons = new Map();
+  for (const id of ids) {
+    const person = figures[id];
+    if (!person) continue;
+    const btn = html('button', `figure-chip faction-${person.faction.toLowerCase()}`);
+    btn.type = 'button';
+    btn.setAttribute('aria-pressed', 'false');
+    btn.append(html('span', 'figure-dot'), html('span', '', person.name));
+    btn.addEventListener('click', () => {
+      const same = openId === id;
+      openId = same ? null : id;
+      for (const [k, b] of buttons) b.setAttribute('aria-pressed', String(k === openId));
+      if (!openId) {
+        detail.hidden = true;
+        return;
+      }
+      const appears = stops
+        .map((s, idx) => ({ s, idx }))
+        .filter(({ s }) => stopFigures[s.id]?.includes(id));
+      const head = html('div', 'figure-bio-head');
+      head.append(html('strong', '', person.name), html('span', 'figure-role', `${person.faction} · ${person.role}`));
+      const stopsRow = html('div', 'figure-stops');
+      stopsRow.append(html('span', 'figure-stops-label', 'Appears at:'));
+      for (const { s, idx } of appears) {
+        const jump = html('button', s.id === stopId ? 'figure-stop-link is-here' : 'figure-stop-link', s.name);
+        jump.type = 'button';
+        jump.addEventListener('click', () => select(idx));
+        stopsRow.append(jump);
+      }
+      detail.replaceChildren(head, html('p', '', person.bio), stopsRow, link(person.cite, person.source));
+      detail.hidden = false;
+    });
+    buttons.set(id, btn);
+    chips.append(btn);
+  }
+  section.append(heading, chips, detail);
+  return section;
+}
+
 export function createSceneReader(dialog, {
   index, select, pause, fallbackFocus, onLayout, isAltRoute, onToggleAltRoute,
 }) {
@@ -137,6 +188,7 @@ export function createSceneReader(dialog, {
   const readerPrevious = dialog.querySelector('#reader-previous');
   const readerNext = dialog.querySelector('#reader-next');
   const readerExpand = dialog.querySelector('#reader-expand');
+  const readerCopyLink = dialog.querySelector('#reader-copy-link');
   const desktop = matchMedia('(min-width: 52.01rem) and (min-height: 30.01rem), (min-width: 70.01rem)');
   let opener;
   let restoreOnClose = true;
@@ -222,6 +274,12 @@ export function createSceneReader(dialog, {
     });
     if (telemetry) readerLead.append(telemetry);
 
+    const cast = buildFiguresSection(stop.id, nextIdx => {
+      select(nextIdx);
+      readerTitle.focus({ preventScroll: true });
+    });
+    if (cast) readerLead.append(cast);
+
     const backstory = html('details', 'reader-backstory');
     backstory.append(noteSummary(hasBackstory ? 'Backstory' : 'More about this stop', (context ?? opening)?.title));
     const content = html('div', 'reader-backstory-copy');
@@ -270,6 +328,15 @@ export function createSceneReader(dialog, {
     dialog.dataset.expanded = dialog.dataset.expanded === 'true' ? 'false' : 'true';
     syncExpandButton();
     notifyLayout();
+  });
+  readerCopyLink?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard?.writeText(location.href);
+      readerCopyLink.textContent = 'Copied';
+      setTimeout(() => { readerCopyLink.textContent = 'Link'; }, 1500);
+    } catch {
+      readerCopyLink.textContent = 'Link';
+    }
   });
   readerPrevious.addEventListener('click', () => step(-1));
   readerNext.addEventListener('click', () => step(1));

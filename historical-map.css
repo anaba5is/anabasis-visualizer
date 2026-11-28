@@ -6,6 +6,12 @@
 .historical-layer .polity-fill {
   fill: var(--polity-fill, var(--polity-color));
   fill-opacity: var(--polity-fill-opacity, .32);
+  pointer-events: auto;
+  cursor: pointer;
+  transition: fill-opacity .16s ease;
+}
+.historical-layer .polity-fill:hover {
+  fill-opacity: calc(var(--polity-fill-opacity, .32) + .16);
 }
 .historical-layer.is-overview .polity-fill {
   fill-opacity: var(--polity-world-opacity, .38);

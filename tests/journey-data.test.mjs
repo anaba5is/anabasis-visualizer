@@ -9,7 +9,22 @@ import { readAtlasLocation, writeAtlasLocation } from '../atlas-location.mjs';
 import { createMapLabels } from '../map-labels.mjs';
 import { bookFor, formatStopDate } from '../journey-format.mjs';
 import { stopMetrics, primaryQuotes } from '../expedition-metrics.mjs';
-import { routeLandmarks, alternativeBook4Corridor } from '../map-data.mjs';
+import { routeLandmarks, seaLegs, alternativeBook4Corridor } from '../map-data.mjs';
+import { figures, stopFigures } from '../expedition-figures.mjs';
+
+test('every stop has key figures with valid bios and Wikisource links', () => {
+  const ids = stops.map(stop => stop.id);
+  assert.deepEqual([...ids].sort(), Object.keys(stopFigures).sort());
+  for (const [stopId, list] of Object.entries(stopFigures)) {
+    assert(list.length >= 2, stopId);
+    for (const id of list) {
+      const person = figures[id];
+      assert(person && person.name && person.faction && person.bio, id);
+      assert.equal(new URL(person.source).protocol, 'https:', id);
+    }
+  }
+  for (const leg of seaLegs) assert(ids.includes(leg), leg);
+});
 
 test('every stop has historical context, elevation metrics, and non-decreasing distance', () => {
   const ids = stops.map(stop => stop.id);

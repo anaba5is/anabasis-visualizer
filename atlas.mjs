@@ -2,9 +2,9 @@ import { stops } from './story.mjs';
 import { captions } from './captions.mjs';
 
 import { scenes } from './scenes.mjs';
-import { mapLabels, routeWaypoints, uncertainLegs, routeLandmarks, alternativeBook4Corridor } from './map-data.mjs';
+import { mapLabels, routeWaypoints, uncertainLegs, seaLegs, routeLandmarks, alternativeBook4Corridor } from './map-data.mjs';
 import { createGlobe, createProjector, keepPointInFrame } from './globe.mjs';
-import { makeTimeline } from './timeline.mjs?v=storytelling-v3';
+import { makeTimeline } from './timeline.mjs?v=storytelling-v6';
 import { createPlayback } from './playback.mjs';
 import { addHistoricalLayer } from './historical-layer.mjs';
 import { historicalSources, politicalRegions } from './historical-data.mjs';
@@ -14,7 +14,7 @@ import { connectPopover } from './popover.mjs';
 import { readAtlasLocation, writeAtlasLocation } from './atlas-location.mjs';
 import { connectWorldPanel } from './world-panel.mjs';
 import { html, link } from './dom.mjs';
-import { createSceneReader } from './scene-reader.mjs?v=storytelling-v3';
+import { createSceneReader } from './scene-reader.mjs?v=storytelling-v6';
 import { bookFor, placeAndBook, formatStopDate } from './journey-format.mjs';
 import { fitMapViewport } from './map-viewport.mjs';
 import { primaryQuotes } from './expedition-metrics.mjs';
@@ -54,6 +54,11 @@ const bordersEra = find('#borders-era');
 const mapModes = find('.map-mode');
 const mapTools = find('.map-controls');
 const worldCard = find('#world-focus-card');
+const landmarkCard = find('#landmark-card');
+const landmarkCardTitle = find('#landmark-card-title');
+const landmarkCardNote = find('#landmark-card-note');
+const landmarkCardLink = find('#landmark-card-link');
+const landmarkCardClose = find('#landmark-card-close');
 const phoneScene = find('#phone-scene');
 const phoneBegin = find('#phone-begin');
 const phoneThumb = find('#phone-thumb-image');
@@ -217,11 +222,15 @@ function setupRoute() {
     const stop = stops[i];
     const points = along([stops[i - 1].coords, ...(routeWaypoints[stop.id] ?? []), stop.coords]);
     const dash = uncertainLegs.has(stop.id) ? ' uncertain' : '';
-    const shadow = svg('path', { class: `route-shadow${dash}` });
-    const line = svg('path', { class: `route-path${dash}` });
-    line.style.setProperty('--phase', phaseByName.get(stop.phase).color);
-    legs.append(shadow, line);
-    routeNodes[i] = { shadow, line, points, offsets: distances(points) };
+    const sea = seaLegs.has(stop.id) ? ' sea-leg' : '';
+    const shadow = svg('path', { class: `route-shadow${dash}${sea}` });
+    const line = svg('path', { class: `route-path${dash}${sea}` });
+    const arrow = svg('path', { class: 'route-arrow', d: 'M-4 -3.1 L3.2 0 L-4 3.1', visibility: 'hidden' });
+    const phaseColor = phaseByName.get(stop.phase).color;
+    line.style.setProperty('--phase', phaseColor);
+    arrow.style.setProperty('--phase', phaseColor);
+    legs.append(shadow, line, arrow);
+    routeNodes[i] = { shadow, line, arrow, points, offsets: distances(points) };
   }
   trail = svg('path', { class: 'route-progress', visibility: 'hidden' });
   tracer = svg('circle', { class: 'route-tracer', r: 3.1, visibility: 'hidden' });
@@ -234,18 +243,44 @@ function setupRoute() {
   altRouteLabel = svg('text', { class: 'alt-route-label' }, alternativeBook4Corridor.name);
   altRouteLayer.append(altRouteShadow, altRoutePath, altRouteLabel);
 
-  landmarkLayer = svg('g', { class: 'route-landmarks', 'aria-hidden': 'true' });
+  landmarkLayer = svg('g', { class: 'route-landmarks' });
   for (const landmark of routeLandmarks) {
-    const group = svg('g', { class: 'route-landmark' });
+    const group = svg('g', { class: 'route-landmark', role: 'button', tabindex: '-1', 'aria-label': `${landmark.name}, Anabasis ${landmark.cite}` });
+    const hit = svg('circle', { class: 'landmark-hit', r: 10 });
     group.append(
       svg('title', {}, `${landmark.name} (Anabasis ${landmark.cite}): ${landmark.note}`),
-      svg('circle', { class: 'landmark-dot', r: 2.3 }),
+      hit,
+      svg('circle', { class: 'landmark-dot', r: 2.5 }),
     );
+    group.addEventListener('click', event => {
+      event.stopPropagation();
+      if (performance.now() < suppressClickUntil) return;
+      showLandmarkCard(landmark);
+    });
     const text = svg('text', { class: 'landmark-label' }, landmark.name);
     landmarkLayer.append(group, text);
     landmarkNodes.push({ ...landmark, group, text });
   }
   map.append(legs, altRouteLayer, landmarkLayer);
+}
+
+function showLandmarkCard(landmark) {
+  if (!landmarkCard) return;
+  const match = landmark.cite.match(/^([1-7])\.(\d+)/);
+  landmarkCardTitle.textContent = `${landmark.name} · ${landmark.cite}`;
+  landmarkCardNote.textContent = landmark.note;
+  if (match) {
+    landmarkCardLink.href = `https://en.wikisource.org/wiki/Anabasis_(Dakyns)/Book_${match[1]}/Chapter_${match[2]}`;
+    landmarkCardLink.textContent = `Read Anabasis ${match[1]}.${match[2]}`;
+    landmarkCardLink.hidden = false;
+  } else {
+    landmarkCardLink.hidden = true;
+  }
+  landmarkCard.hidden = false;
+}
+
+function hideLandmarkCard() {
+  if (landmarkCard) landmarkCard.hidden = true;
 }
 
 function drawTrail(view = viewAtLastDraw) {
@@ -284,11 +319,16 @@ function setupMarkers() {
       'aria-pressed': 'false',
     });
     marker.style.setProperty('--phase', phaseByName.get(stop.phase).color);
+    const pinShape = stop.id === 'cunaxa'
+      ? svg('path', { class: 'point battle-point', d: 'M0 -5.6 L5.6 0 L0 5.6 L-5.6 0 Z' })
+      : stop.id === 'mount-theches'
+        ? svg('path', { class: 'point summit-point', d: 'M0 -5.8 L5.4 4.2 L-5.4 4.2 Z' })
+        : svg('circle', { class: 'point', r: 4.5 });
     marker.append(
       svg('title', {}, stop.name),
       svg('circle', { class: 'tap-zone', r: 13 }),
       svg('circle', { class: 'current-ring', r: 11 }),
-      svg('circle', { class: 'point', r: 4.5 }),
+      pinShape,
     );
     marker.addEventListener('click', event => {
       if (performance.now() < suppressClickUntil && event.detail) return;
@@ -428,6 +468,7 @@ function frameStopCamera(i) {
 
 function chooseStop(i) {
   if (!stops[i]) return;
+  hideLandmarkCard();
   const fromOpening = awaitingIntro || !intro.hidden;
   if (sources.open) sources.open = false;
   setPlaying(false);
@@ -701,10 +742,24 @@ function draw() {
   for (const { node, lines } of riverNodes) {
     node.setAttribute('d', view.scale > .48 ? lines.map(line => linePath(line, view)).join('') : '');
   }
-  for (const { shadow, line, points } of layers.route ? routeNodes.slice(1) : []) {
+  for (const { shadow, line, arrow, points } of layers.route ? routeNodes.slice(1) : []) {
     const d = linePath(points, view);
     shadow.setAttribute('d', d);
     line.setAttribute('d', d);
+    const mid = Math.floor(points.length / 2);
+    const a = points[Math.max(0, mid - 1)];
+    const b = points[Math.min(points.length - 1, mid + 1)];
+    const p1 = view.locate(a);
+    const p2 = view.locate(b);
+    const span = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const showArrow = view.scale > .52 && p1.visible && p2.visible && span > 4;
+    arrow.setAttribute('visibility', showArrow ? 'visible' : 'hidden');
+    if (showArrow) {
+      const cx = (p1.x + p2.x) / 2;
+      const cy = (p1.y + p2.y) / 2;
+      const deg = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
+      arrow.setAttribute('transform', `translate(${cx.toFixed(1)} ${cy.toFixed(1)}) rotate(${deg.toFixed(1)})`);
+    }
   }
   stops.forEach((stop, i) => {
     const { x, y, visible } = positions[i];
@@ -1110,8 +1165,42 @@ sources.querySelector('summary').addEventListener('click', event => {
   dismissSources();
 });
 sources.addEventListener('toggle', () => navSources.setAttribute('aria-expanded', String(sources.open)));
+landmarkCardClose?.addEventListener('click', hideLandmarkCard);
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && sources.open && sources.contains(document.activeElement)) dismissSources();
+  if (event.key === 'Escape') {
+    if (landmarkCard && !landmarkCard.hidden) {
+      hideLandmarkCard();
+      return;
+    }
+    if (sources.open && sources.contains(document.activeElement)) {
+      dismissSources();
+      return;
+    }
+  }
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+  if (event.key === '[') {
+    event.preventDefault();
+    chooseStop(selectedIndex - 1);
+  } else if (event.key === ']') {
+    event.preventDefault();
+    chooseStop(selectedIndex + 1);
+  } else if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+    && document.activeElement !== mapFrame && !stations.contains(document.activeElement)) {
+    event.preventDefault();
+    chooseStop(selectedIndex + (event.key === 'ArrowRight' ? 1 : -1));
+  } else if (event.key === ' ' && tag !== 'BUTTON' && tag !== 'A' && tag !== 'SUMMARY') {
+    event.preventDefault();
+    setPlaying(!playback.isPlaying());
+  } else if (event.key === 'r' || event.key === 'R') {
+    showPreset('route');
+  } else if (event.key === 'g' || event.key === 'G') {
+    showPreset('globe');
+  } else if (event.key === 's' || event.key === 'S') {
+    if (readerDialog.open) sceneReader.close();
+    else openScene(find('.scene-action') ?? phoneScene);
+  }
 });
 if (document.fullscreenEnabled && document.documentElement.requestFullscreen) {
   fullscreen.hidden = false;
@@ -1191,9 +1280,10 @@ worldPanel = connectWorldPanel({
     }
     polityLegend.hidden = !layers.borders;
     closeLayers();
+    hideLandmarkCard();
     if (sources.open) dismissSources();
     goTo({ lon: entry.coords[0], lat: entry.coords[1], scale: Math.max(globeScale(), zoom ?? globeScale()) });
-    worldCard.querySelector('button').focus({ preventScroll: true });
+    worldCard.querySelector('#world-return').focus({ preventScroll: true });
     announcement.textContent = 'Globe centered on ' + entry.name;
   },
   onReturn() {

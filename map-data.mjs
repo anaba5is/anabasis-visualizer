@@ -149,6 +149,11 @@ export const uncertainLegs = new Set([
   'pergamum',
 ]);
 
+export const seaLegs = new Set([
+  'calpe',
+  'byzantium',
+]);
+
 // Named text landmarks along the march shown quietly at closer route zoom.
 export const routeLandmarks = [
   { id: 'celaenae-park', name: 'Celaenae', leg: 'tarsus', coords: [30.17, 38.07], cite: '1.2.7–9', note: 'Cyrus’s palace and game park at the sources of the Maeander; 30 days halt.' },
