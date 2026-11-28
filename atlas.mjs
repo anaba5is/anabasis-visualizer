@@ -1,23 +1,23 @@
 import { stops } from './story.mjs';
 import { captions } from './captions.mjs';
 
-import { scenes } from './scenes.mjs';
-import { mapLabels, routeWaypoints, uncertainLegs, seaLegs, routeLandmarks, alternativeBook4Corridor } from './map-data.mjs';
-import { createGlobe, createProjector, keepPointInFrame } from './globe.mjs';
+import { scenes } from './scenes.mjs?v=storytelling-v6';
+import { mapLabels, routeWaypoints, uncertainLegs, seaLegs, routeLandmarks, alternativeBook4Corridor } from './map-data.mjs?v=storytelling-v6';
+import { createGlobe, createProjector, keepPointInFrame } from './globe.mjs?v=storytelling-v6';
 import { makeTimeline } from './timeline.mjs?v=storytelling-v6';
 import { createPlayback } from './playback.mjs';
-import { addHistoricalLayer } from './historical-layer.mjs';
-import { historicalSources, politicalRegions } from './historical-data.mjs';
+import { addHistoricalLayer } from './historical-layer.mjs?v=storytelling-v6';
+import { historicalSources, politicalRegions } from './historical-data.mjs?v=storytelling-v6';
 import { createMapLabels } from './map-labels.mjs';
 import { firstAvailableLabel } from './label-geometry.mjs';
 import { connectPopover } from './popover.mjs';
 import { readAtlasLocation, writeAtlasLocation } from './atlas-location.mjs';
-import { connectWorldPanel } from './world-panel.mjs';
+import { connectWorldPanel } from './world-panel.mjs?v=storytelling-v6';
 import { html, link } from './dom.mjs';
 import { createSceneReader } from './scene-reader.mjs?v=storytelling-v6';
 import { bookFor, placeAndBook, formatStopDate } from './journey-format.mjs';
 import { fitMapViewport } from './map-viewport.mjs';
-import { primaryQuotes } from './expedition-metrics.mjs';
+import { primaryQuotes } from './expedition-metrics.mjs?v=storytelling-v6';
 
 const phases = [
   { name: 'March inland', color: '#f1b66f', timelineColor: '#a4662a' },
