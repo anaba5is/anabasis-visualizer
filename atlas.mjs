@@ -1088,20 +1088,9 @@ window.addEventListener('pointercancel', endPointer);
 mapFrame.addEventListener('keydown', keyboardGlobe);
 mapFrame.addEventListener('wheel', event => {
   event.preventDefault();
-  const isZoom = event.ctrlKey || event.deltaMode !== 0 || (event.deltaX === 0 && Math.abs(event.deltaY) >= 48);
-  if (isZoom) {
-    const sensitivity = event.deltaMode ? .05 : event.ctrlKey ? .008 : .0025;
-    const factor = Math.exp(clamp(-event.deltaY * sensitivity, -.45, .45));
-    changeZoom(factor, { animate: false });
-    return;
-  }
-  setPlaying(false);
-  stopCameraAnimation();
-  setMode('free');
-  const degreesPerPixel = 57.296 / getView().radius;
-  camera.lon = wrapLon(camera.lon + event.deltaX * degreesPerPixel / Math.max(.4, Math.cos(camera.lat * Math.PI / 180)));
-  camera.lat = clamp(camera.lat - event.deltaY * degreesPerPixel, -83, 83);
-  queueDraw();
+  const sensitivity = event.deltaMode ? .05 : event.ctrlKey ? .008 : .0025;
+  const factor = Math.exp(clamp(-event.deltaY * sensitivity, -.45, .45));
+  changeZoom(factor, { animate: false });
 }, { passive: false });
 navSources.addEventListener('click', event => {
   event.preventDefault();
