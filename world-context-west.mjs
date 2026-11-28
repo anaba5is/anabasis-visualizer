@@ -4,6 +4,7 @@ export const westPolities = {
   Carthage: {
     name: 'Carthaginian sphere',
     group: 'africa',
+    coords: [6.8, 34.4],
     note: 'The shading generalizes a Punic sphere of influence. The Sicilian peace of 405 BCE distinguished territory, tribute and communities that governed themselves.',
     source: 'https://penelope.uchicago.edu/Thayer/E/Roman/Texts/Diodorus_Siculus/13E%2A.html',
     color: '#ad6041',

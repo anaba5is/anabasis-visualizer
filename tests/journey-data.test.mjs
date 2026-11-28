@@ -8,6 +8,39 @@ import { expeditionContext, sceneContext } from '../scene-context.mjs';
 import { readAtlasLocation, writeAtlasLocation } from '../atlas-location.mjs';
 import { createMapLabels } from '../map-labels.mjs';
 import { bookFor, formatStopDate } from '../journey-format.mjs';
+import { stopMetrics, primaryQuotes } from '../expedition-metrics.mjs';
+import { routeLandmarks, alternativeBook4Corridor } from '../map-data.mjs';
+
+test('every stop has historical context, elevation metrics, and non-decreasing distance', () => {
+  const ids = stops.map(stop => stop.id);
+  assert.deepEqual([...ids].sort(), Object.keys(sceneContext).sort());
+  assert.deepEqual([...ids].sort(), Object.keys(stopMetrics).sort());
+  let prevKm = -1;
+  for (const id of ids) {
+    const m = stopMetrics[id];
+    assert(Number.isFinite(m.elevationM) && m.elevationM >= 0, id);
+    assert(m.terrain.length > 0, id);
+    assert(m.plottedKm >= prevKm, id);
+    prevKm = m.plottedKm;
+    if (m.muster) assert.match(m.musterCite, /^[1-7]\.\d+\.\d+$/);
+  }
+  for (const [id, quote] of Object.entries(primaryQuotes)) {
+    assert(ids.includes(id), id);
+    assert(quote.text.length > 0 && /^[1-7]\.\d+\.\d+$/.test(quote.cite), id);
+  }
+});
+
+test('route landmarks and alternative Book IV corridor carry valid coordinates and citations', () => {
+  const ids = new Set(stops.map(stop => stop.id));
+  assert(routeLandmarks.length >= 10);
+  for (const lm of routeLandmarks) {
+    assert(ids.has(lm.leg), lm.id);
+    assert(Math.abs(lm.coords[0]) <= 180 && Math.abs(lm.coords[1]) <= 90, lm.id);
+    assert(lm.cite && lm.note, lm.id);
+  }
+  assert(alternativeBook4Corridor.points.length >= 5);
+  assert.equal(new URL(alternativeBook4Corridor.source).protocol, 'https:');
+});
 
 test('every stop has a date label, a scene, and its local image', () => {
   const ids = stops.map(stop => stop.id).sort();

@@ -25,7 +25,7 @@ test('disputed or late source outlines are excluded from the shaded layer', () =
   }
 
   const sites = new Set(worldSiteRecords.map(site => site.id));
-  for (const id of ['rome', 'monte-alban', 'budj-bim']) assert(sites.has(id), id);
+  for (const id of ['rome', 'monte-alban', 'budj-bim', 'taxila-gandhara', 'anuradhapura']) assert(sites.has(id), id);
 });
 
 test('all world index records link to sources and a browsable geographic region', () => {

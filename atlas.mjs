@@ -2,20 +2,22 @@ import { stops } from './story.mjs';
 import { captions } from './captions.mjs';
 
 import { scenes } from './scenes.mjs';
-import { mapLabels, routeWaypoints, uncertainLegs } from './map-data.mjs';
+import { mapLabels, routeWaypoints, uncertainLegs, routeLandmarks, alternativeBook4Corridor } from './map-data.mjs';
 import { createGlobe, createProjector, keepPointInFrame } from './globe.mjs';
-import { makeTimeline } from './timeline.mjs?v=atlas-review';
+import { makeTimeline } from './timeline.mjs?v=storytelling-v3';
 import { createPlayback } from './playback.mjs';
 import { addHistoricalLayer } from './historical-layer.mjs';
 import { historicalSources, politicalRegions } from './historical-data.mjs';
 import { createMapLabels } from './map-labels.mjs';
+import { firstAvailableLabel } from './label-geometry.mjs';
 import { connectPopover } from './popover.mjs';
 import { readAtlasLocation, writeAtlasLocation } from './atlas-location.mjs';
 import { connectWorldPanel } from './world-panel.mjs';
 import { html, link } from './dom.mjs';
-import { createSceneReader } from './scene-reader.mjs?v=atlas-review';
+import { createSceneReader } from './scene-reader.mjs?v=storytelling-v3';
 import { bookFor, placeAndBook, formatStopDate } from './journey-format.mjs';
 import { fitMapViewport } from './map-viewport.mjs';
+import { primaryQuotes } from './expedition-metrics.mjs';
 
 const phases = [
   { name: 'March inland', color: '#f1b66f', timelineColor: '#a4662a' },
@@ -46,6 +48,9 @@ const masthead = find('.masthead');
 const atlasWindow = find('.atlas-window');
 const intro = find('#journey-intro');
 const seaMoment = find('#sea-moment');
+const momentQuote = find('#moment-quote');
+const momentCite = find('#moment-cite');
+const bordersEra = find('#borders-era');
 const mapModes = find('.map-mode');
 const mapTools = find('.map-controls');
 const worldCard = find('#world-focus-card');
@@ -82,7 +87,7 @@ const speedControl = find('#playback-speed');
 const followControl = find('#follow-camera');
 const layers = {
   route: true, terrain: true, borders: true, worldSites: true,
-  administration: false, neighbors: false, places: true, grid: true,
+  administration: false, neighbors: false, altRoute: false, places: true, grid: true,
 };
 const scaleBar = find('#map-scale');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -94,6 +99,13 @@ const labelNodes = [];
 const routeNodes = [];
 const gridNodes = [];
 const riverNodes = [];
+const landmarkNodes = [];
+const altRoutePoints = along(alternativeBook4Corridor.points);
+let altRouteLayer;
+let altRouteShadow;
+let altRoutePath;
+let altRouteLabel;
+let landmarkLayer;
 let riverLayer;
 let riverRequest;
 const mapLabelNodes = [];
@@ -215,7 +227,25 @@ function setupRoute() {
   tracer = svg('circle', { class: 'route-tracer', r: 3.1, visibility: 'hidden' });
   legs.append(trail, tracer);
   routeLayer = legs;
-  map.append(legs);
+
+  altRouteLayer = svg('g', { class: 'alt-route-layer', 'aria-hidden': 'true' });
+  altRouteShadow = svg('path', { class: 'alt-route-shadow' });
+  altRoutePath = svg('path', { class: 'alt-route-path' });
+  altRouteLabel = svg('text', { class: 'alt-route-label' }, alternativeBook4Corridor.name);
+  altRouteLayer.append(altRouteShadow, altRoutePath, altRouteLabel);
+
+  landmarkLayer = svg('g', { class: 'route-landmarks', 'aria-hidden': 'true' });
+  for (const landmark of routeLandmarks) {
+    const group = svg('g', { class: 'route-landmark' });
+    group.append(
+      svg('title', {}, `${landmark.name} (Anabasis ${landmark.cite}): ${landmark.note}`),
+      svg('circle', { class: 'landmark-dot', r: 2.3 }),
+    );
+    const text = svg('text', { class: 'landmark-label' }, landmark.name);
+    landmarkLayer.append(group, text);
+    landmarkNodes.push({ ...landmark, group, text });
+  }
+  map.append(legs, altRouteLayer, landmarkLayer);
 }
 
 function drawTrail(view = viewAtLastDraw) {
@@ -324,6 +354,8 @@ function setupPhases() {
 
 function sceneFigure(scene) {
   const figure = html('figure', 'scene');
+  figure.dataset.surface = scene.surface ?? (scene.mount ? 'mount' : 'bleed');
+  if (scene.mount) figure.style.setProperty('--scene-mount', scene.mount);
   const image = html('img', scene.contain ? 'contain' : '');
   image.loading = 'lazy';
   image.src = `./assets/previews/card-${scene.file}`;
@@ -334,6 +366,9 @@ function sceneFigure(scene) {
 }
 
 function openScene(trigger) {
+  closeLayers?.();
+  closePlaybackSettings?.();
+  if (sources.open) sources.open = false;
   sceneReader.open(trigger);
 }
 
@@ -357,7 +392,7 @@ function renderStory(stop, i) {
   storyContent.replaceChildren(copy, sceneFigure(scene), summary, expand);
 
   phoneThumb.src = `./assets/previews/thumb-${scene.file}`;
-  phoneStage.textContent = `${formatStopDate(stop)} · ${i + 1} / ${stops.length}`;
+  phoneStage.textContent = `${formatStopDate(stop)} · ${i + 1}/${stops.length}`;
   phonePlace.textContent = stop.name;
   phoneScene.setAttribute('aria-label', `Details for ${stop.name}`);
   timelineBook.textContent = `Book ${book} · ${formatStopDate(stop)}`;
@@ -370,11 +405,52 @@ function bookmark(i) {
   history.replaceState(null, '', writeAtlasLocation('stop', stops[i].id));
 }
 
+function frameStopCamera(i) {
+  const points = routeNodes[i]?.points ?? [stops[i].coords];
+  const [startLon, startLat] = points[0];
+  const [endLon, endLat] = points.at(-1);
+  const extent = Math.max(
+    ...points.map(([lon, lat]) => Math.hypot((lon - endLon) * .8, lat - endLat)),
+  );
+  const scale = i === 0 ? 1.08 : clamp(1.38 - extent * .038, 1.06, 1.34);
+  const target = {
+    lon: i === 0 ? 31.2 : startLon + (endLon - startLon) * .64,
+    lat: i === 0 ? 38.4 : startLat + (endLat - startLat) * .64,
+    scale,
+  };
+  const frame = cameraFrame();
+  const adjusted = keepPointInFrame(stops[i].coords, {
+    ...frame, ...target, radius: frame.baseline * scale,
+  });
+  if (adjusted) Object.assign(target, adjusted);
+  return target;
+}
+
 function chooseStop(i) {
   if (!stops[i]) return;
-  if (worldFocus || awaitingIntro || !intro.hidden || mode === 'globe') setMode('route');
+  const fromOpening = awaitingIntro || !intro.hidden;
+  if (sources.open) sources.open = false;
   setPlaying(false);
-  selectStop(i);
+  if (fromOpening && i === 0) {
+    setMode('route');
+    selectStop(i, { move: false });
+  } else if (followControl.checked) {
+    if (worldFocus) {
+      worldFocus = undefined;
+      worldPanel.hide();
+      atlasWindow.classList.remove('world-focused');
+      frameBounds = undefined;
+    }
+    dismissIntro();
+    awaitingIntro = false;
+    mode = 'free';
+    syncMode();
+    selectStop(i, { move: false });
+    goTo(frameStopCamera(i), { duration: 660 });
+  } else {
+    if (worldFocus || fromOpening || mode === 'globe') setMode('route');
+    selectStop(i);
+  }
   playback.reset(beatDuration(i));
   syncPlayButton(false);
 }
@@ -476,12 +552,13 @@ function measureCameraFrame() {
   const height = mapFrame.clientHeight;
   const origin = mapFrame.getBoundingClientRect();
   const box = element => layoutBox(element, origin);
-  const scene = sceneReader.isSideOpen() ? readerDialog : storyPanel;
+  const readerFraming = sceneReader.isSideOpen() || sceneReader.isHalfSheetOpen();
+  const scene = readerFraming ? readerDialog : storyPanel;
   const headers = width < 690 ? [masthead, phaseControls, worldCard] : [masthead, phaseControls];
   return fitMapViewport(width, height, {
     headers: headers.map(box),
     panels: [scene, timelinePanel].map(box),
-    tools: [mapKey, mapModes, mapTools].map(box),
+    tools: readerFraming && width < 690 ? [] : [mapKey, mapModes, mapTools].map(box),
     intro: box(intro),
   });
 }
@@ -492,7 +569,7 @@ function cameraFrame() {
 
 function getView() {
   const frame = cameraFrame();
-  const readerOpen = sceneReader.isSideOpen();
+  const readerOpen = sceneReader.isSideOpen() || sceneReader.isHalfSheetOpen();
   const view = { ...frame, ...camera, radius: frame.baseline * camera.scale, focusId: worldFocus?.id, readerOpen };
   if (readerOpen) {
     const adjusted = keepPointInFrame(stops[selectedIndex].coords, view);
@@ -525,10 +602,17 @@ function draw() {
   drawFrame = undefined;
   const view = getView();
   if (!view.width || !view.height) return;
-  const storyMap = !worldFocus && (mode === 'route' || view.readerOpen || (playback.isPlaying() && followControl.checked));
+  const storyMap = !worldFocus && (mode === 'route' || mode === 'free' || view.readerOpen || (playback.isPlaying() && followControl.checked));
   atlasWindow.classList.toggle('story-map', storyMap);
   view.storyMap = storyMap;
-  seaMoment.hidden = !storyMap || stops[selectedIndex].id !== 'mount-theches';
+  const activeQuote = storyMap && !sceneReader.isHalfSheetOpen() ? primaryQuotes[stops[selectedIndex].id] : null;
+  const showQuote = Boolean(activeQuote?.mapCallout);
+  seaMoment.hidden = !showQuote;
+  if (showQuote) {
+    momentQuote.textContent = `“${activeQuote.text}”`;
+    momentCite.replaceChildren('Xenophon, ', html('i', '', 'Anabasis'), ` ${activeQuote.cite}`);
+  }
+  if (bordersEra) bordersEra.hidden = !layers.borders;
   const projection = [view.width, view.height, view.x, view.y, view.lon, view.lat, view.radius, view.scale].join(',');
   const surfaceKey = `${projection}|${layers.terrain}|${window.devicePixelRatio}`;
   if (lastSurfaceView !== surfaceKey) {
@@ -556,12 +640,65 @@ function draw() {
   const callout = seaMoment.hidden ? null : layoutBox(seaMoment, mapFrame.getBoundingClientRect());
   const occupied = callout ? [...pinBounds, callout] : pinBounds;
   const { occupied: stopLabels } = labelRenderer.drawStops(view, positions, selectedIndex, layers, occupied);
+  const visibleStopIds = new Set(stops.filter((_, i) =>
+    labelNodes[i].getAttribute('visibility') === 'visible' || (showPin(i) && positions[i].visible),
+  ).map(stop => stop.id));
   const routeAnchor = layers.route ? positions[selectedIndex] : null;
-  const historicalLabels = drawHistoricalLayer(view, layers, routeAnchor, callout ? [...stopLabels, callout] : stopLabels);
+  const historicalLabels = drawHistoricalLayer(view, layers, routeAnchor, callout ? [...stopLabels, callout] : stopLabels, visibleStopIds);
   const focusedPlace = worldFocus?.kind ? view.locate(worldFocus.coords) : undefined;
   worldFocusMarker.setAttribute('visibility', focusedPlace?.visible ? 'visible' : 'hidden');
   if (focusedPlace?.visible) worldFocusMarker.setAttribute('transform', `translate(${focusedPlace.x} ${focusedPlace.y})`);
-  labelRenderer.drawPlaces(view, [...historicalLabels, ...pinBounds], layers.places);
+  const allOccupied = [...historicalLabels, ...pinBounds];
+  labelRenderer.drawPlaces(view, allOccupied, layers.places);
+
+  altRouteLayer.style.display = layers.altRoute ? '' : 'none';
+  if (layers.altRoute) {
+    const altD = linePath(altRoutePoints, view);
+    altRouteShadow.setAttribute('d', altD);
+    altRoutePath.setAttribute('d', altD);
+    const altPt = view.locate(alternativeBook4Corridor.labelCoords);
+    const altMetrics = { width: 158, above: 12, below: 4 };
+    const altBox = altPt.visible && layers.places
+      ? firstAvailableLabel(altPt, altMetrics, [[-10, -10, 'end'], [10, -10, 'start'], [0, 18, 'middle']], view.labelBounds, allOccupied)
+      : undefined;
+    altRouteLabel.setAttribute('visibility', altBox ? 'visible' : 'hidden');
+    if (altBox) {
+      altRouteLabel.style.textAnchor = altBox.anchor;
+      altRouteLabel.setAttribute('x', altBox.x.toFixed(1));
+      altRouteLabel.setAttribute('y', altBox.y.toFixed(1));
+      allOccupied.push(altBox);
+    }
+  }
+
+  const showLandmarks = layers.route && layers.places && view.scale > .98 && !worldFocus;
+  landmarkLayer.style.display = showLandmarks ? '' : 'none';
+  if (showLandmarks) {
+    for (const item of landmarkNodes) {
+      if (layers.administration && item.id === 'celaenae-park') {
+        item.group.setAttribute('visibility', 'hidden');
+        item.text.setAttribute('visibility', 'hidden');
+        continue;
+      }
+      const pt = view.locate(item.coords);
+      const inBounds = pt.visible && pt.x > 8 && pt.x < view.width - 8 && pt.y > 8 && pt.y < view.height - 8;
+      item.group.setAttribute('visibility', inBounds ? 'visible' : 'hidden');
+      if (!inBounds) {
+        item.text.setAttribute('visibility', 'hidden');
+        continue;
+      }
+      item.group.setAttribute('transform', `translate(${pt.x.toFixed(1)} ${pt.y.toFixed(1)})`);
+      allOccupied.push({ left: pt.x - 4, right: pt.x + 4, top: pt.y - 4, bottom: pt.y + 4 });
+      const metrics = { width: item.name.length * 6.2 + 8, above: 11, below: 3 };
+      const box = firstAvailableLabel(pt, metrics, [[7, 3, 'start'], [-7, 3, 'end'], [0, -8, 'middle'], [0, 14, 'middle']], view.labelBounds, allOccupied);
+      item.text.setAttribute('visibility', box ? 'visible' : 'hidden');
+      if (box) {
+        item.text.style.textAnchor = box.anchor;
+        item.text.setAttribute('x', box.x.toFixed(1));
+        item.text.setAttribute('y', box.y.toFixed(1));
+        allOccupied.push(box);
+      }
+    }
+  }
   for (const { node, points, regional } of gridNodes) {
     node.setAttribute('d', layers.grid && regional === (view.scale >= .52) ? linePath(points, view) : '');
   }
@@ -787,8 +924,22 @@ const sceneReader = createSceneReader(readerDialog, {
   index: () => selectedIndex,
   select: chooseStop,
   pause: () => setPlaying(false),
-  onLayout(sideOpen) {
+  isAltRoute: () => layers.altRoute,
+  onToggleAltRoute() {
+    layers.altRoute = !layers.altRoute;
+    const checkbox = layerMenu.querySelector('[data-layer="altRoute"]');
+    if (checkbox) checkbox.checked = layers.altRoute;
+    if (layers.altRoute && camera.scale < 1.1) {
+      mode = 'free';
+      syncMode();
+      goTo({ lon: 40.3, lat: 40.1, scale: 1.38 });
+    }
+    lastProjectedView = undefined;
+    queueDraw();
+  },
+  onLayout(sideOpen, halfSheet) {
     atlasWindow.classList.toggle('scene-reading', sideOpen);
+    atlasWindow.classList.toggle('sheet-reading', Boolean(halfSheet));
     storyPanel.inert = sideOpen;
     resizeMap();
   },
@@ -906,6 +1057,8 @@ mapFrame.addEventListener('wheel', event => {
 navSources.addEventListener('click', event => {
   event.preventDefault();
   setPlaying(false);
+  closeLayers();
+  closePlaybackSettings();
   sources.open = true;
   closeSources.focus({ preventScroll: true });
 });
@@ -959,6 +1112,14 @@ layerMenu.addEventListener('change', event => {
   const { layer } = event.target.dataset;
   layers[layer] = event.target.checked;
   if (layer === 'borders') polityLegend.hidden = !layers.borders;
+  if (layer === 'altRoute') {
+    sceneReader.refresh();
+    if (layers.altRoute && camera.scale < 1.05) {
+      mode = 'free';
+      syncMode();
+      goTo({ lon: 40.3, lat: 40.1, scale: 1.38 });
+    }
+  }
   if ((layer === 'administration' || layer === 'neighbors') && layers[layer] && camera.scale < .34) showPreset('route');
   queueDraw();
 });
@@ -993,7 +1154,7 @@ worldPanel = connectWorldPanel({
     polityLegend.hidden = !layers.borders;
     closeLayers();
     if (sources.open) dismissSources();
-    goTo({ lon: entry.coords[0], lat: entry.coords[1], scale: zoom ?? globeScale() });
+    goTo({ lon: entry.coords[0], lat: entry.coords[1], scale: Math.max(globeScale(), zoom ?? globeScale()) });
     worldCard.querySelector('button').focus({ preventScroll: true });
     announcement.textContent = 'Globe centered on ' + entry.name;
   },

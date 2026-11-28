@@ -13,6 +13,7 @@ export const ancientExpedition = {
     objectDate: 'ca. 560–546 BCE',
     imageKind: 'Ancient coin',
     contain: true,
+    mount: '#666764',
   },
   tarsus: {
     file: 'tarsus-silver-stater.webp',
@@ -25,6 +26,7 @@ export const ancientExpedition = {
     objectDate: 'ca. 420–410 BCE',
     imageKind: 'Ancient coin',
     contain: true,
+    surface: 'paper',
   },
   thapsacus: {
     file: 'thapsacus-persepolis-relief.webp',
@@ -37,6 +39,7 @@ export const ancientExpedition = {
     objectDate: 'ca. 405–359 BCE',
     imageKind: 'Ancient relief',
     contain: true,
+    mount: '#999999',
   },
   cunaxa: {
     file: 'cunaxa-greek-persian-amphora.webp',
@@ -49,6 +52,7 @@ export const ancientExpedition = {
     objectDate: 'ca. 480–470 BCE',
     imageKind: 'Ancient vase',
     contain: true,
+    mount: '#bbb9b7',
   },
   'great-zab': {
     file: 'corinthian-helmet.webp',
@@ -61,6 +65,7 @@ export const ancientExpedition = {
     objectDate: 'Early 5th century BCE',
     imageKind: 'Ancient armor',
     contain: true,
+    mount: '#969696',
   },
   mespila: {
     file: 'mespila-nineveh-relief.webp',
@@ -73,6 +78,7 @@ export const ancientExpedition = {
     objectDate: 'ca. 704–681 BCE',
     imageKind: 'Ancient relief',
     contain: true,
+    mount: '#939190',
   },
   'carduchian-mountains': {
     file: 'retreat-klooster.webp',
@@ -85,6 +91,7 @@ export const ancientExpedition = {
     objectDate: '1920',
     imageKind: 'Later illustration',
     contain: true,
+    surface: 'paper',
   },
   'armenian-highlands': {
     file: 'armenian-erebuni-rhyton.webp',
@@ -97,6 +104,7 @@ export const ancientExpedition = {
     objectDate: '5th–4th century BCE',
     imageKind: 'Ancient vessel',
     contain: true,
+    mount: '#14100d',
   },
   'mount-theches': {
     file: 'theches-vogel.webp',

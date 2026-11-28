@@ -50,11 +50,11 @@ export const americanAndOceanianSites = [
 ];
 
 export const worldViews = [
-  { id: 'europe', name: 'Europe', coords: [15, 43] },
-  { id: 'africa', name: 'Africa', coords: [19, 7] },
-  { id: 'west-asia', name: 'West Asia', coords: [48, 31] },
-  { id: 'south-asia', name: 'South Asia', coords: [82, 24] },
-  { id: 'east-asia', name: 'East and Inner Asia', coords: [112, 34] },
-  { id: 'americas', name: 'The Americas', coords: [-99, 15] },
-  { id: 'oceania', name: 'Oceania', coords: [151, -18] },
+  { id: 'europe', name: 'Europe', coords: [13, 44], scale: .38, note: 'Greek, Thracian, Macedonian, Italic, and Iron Age European centers around 401 BCE.' },
+  { id: 'africa', name: 'Africa', coords: [17, 14], scale: .25, note: 'Punic North Africa, Napatan Kush, Egypt in revolt, and West African communities.' },
+  { id: 'west-asia', name: 'West Asia', coords: [46, 31], scale: .38, note: 'The Achaemenid Empire and South Arabian kingdoms at the outset of Cyrus’s march.' },
+  { id: 'south-asia', name: 'South Asia', coords: [79, 22], scale: .35, note: 'Gandhara at Taxila, Magadha in the Ganges basin, and early urban Anuradhapura.' },
+  { id: 'east-asia', name: 'East and Inner Asia', coords: [113, 35], scale: .35, note: 'Early Warring States polities alongside Altai, Korean, Japanese, and Red River communities.' },
+  { id: 'americas', name: 'The Americas', coords: [-91, 13], scale: .27, note: 'Early Woodland, Mesoamerican, and Andean ceremonial and urban centers around 401 BCE.' },
+  { id: 'oceania', name: 'Oceania', coords: [154, -20], scale: .26, note: 'Highland New Guinea cultivation, Gunditjmara aquaculture, and Polynesian island settlements.' },
 ];

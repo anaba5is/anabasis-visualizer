@@ -66,6 +66,16 @@ export const asiaSites = [
     note: 'An early kingdom of the middle Ganges basin, marked at its old center of Rajgir. The chronology of its expansion and rulers remains debated.',
   },
   {
+    id: 'taxila-gandhara', name: 'Taxila', group: 'south-asia', kind: 'site', coords: [72.79, 33.75], overview: true,
+    source: 'https://whc.unesco.org/en/list/139/',
+    note: 'Early urban settlement at the Bhir Mound in Gandhara, linking northern South Asia with the eastern Achaemenid provinces.',
+  },
+  {
+    id: 'anuradhapura', name: 'Anuradhapura', group: 'south-asia', kind: 'site', coords: [80.39, 8.35],
+    source: 'https://whc.unesco.org/en/list/200/',
+    note: 'Early urban center in north-central Sri Lanka with Iron Age settlement layers spanning the fifth and fourth centuries BCE.',
+  },
+  {
     id: 'pazyryk-altai', name: 'Pazyryk communities', group: 'east-asia', kind: 'community', coords: [88.04, 50.74],
     source: 'https://whc.unesco.org/en/tentativelists/6283/',
     note: 'Altai communities known archaeologically through burial mounds, textiles and objects associated with mobile pastoral life. The marker indicates the Pazyryk burial area.',

@@ -243,7 +243,7 @@ export function addHistoricalLayer(map) {
     const parent = isWorldSite ? worldSites : isNeighbor ? neighbors : seats;
     parent.append(group);
     return {
-      id, coords, group, isNeighbor, isWorldSite, hasMarker, label: name,
+      id, stopId: administration.stopId, coords, group, isNeighbor, isWorldSite, hasMarker, label: name,
       overview: administration.overview ?? kind === 'polity',
       duplicate: isWorldSite ? undefined : genericNames.get(administration.name),
     };
@@ -261,7 +261,7 @@ export function addHistoricalLayer(map) {
     measuredWidth = map.clientWidth;
   }
 
-  function drawHistoricalLayer(view, layers, routePoint, obstacles = []) {
+  function drawHistoricalLayer(view, layers, routePoint, obstacles = [], visibleStopIds = null) {
     if (!view.locate) view = { ...view, locate: createProjector(view) };
     const bordersVisible = layers.borders;
     const namesVisible = bordersVisible && layers.places !== false;
@@ -302,8 +302,9 @@ export function addHistoricalLayer(map) {
             && (focused || ((shape.major || view.scale > .43) && footprint));
           let label = null;
           if (labelAllowed) {
+            const maxShift = shape.major ? (view.scale < .35 ? 28 : 54) : 34;
             for (const offset of LABEL_OFFSETS) {
-              const candidate = centeredLabel(point, shape.width, bounds, offset, shape.major ? 72 : 36);
+              const candidate = centeredLabel(point, shape.width, bounds, offset, maxShift);
               if (labelFits(candidate, bounds, occupied)) {
                 label = candidate;
                 break;
@@ -317,30 +318,38 @@ export function addHistoricalLayer(map) {
       lastProjection = projection;
     }
 
-    for (const { id, group, label, coords, width, isNeighbor, isWorldSite, hasMarker, overview, duplicate } of anchors) {
+    // Reserve visible marker icons first so neighbor labels never cross an adjacent symbol.
+    const projectedAnchors = anchors.map(anchor => {
+      const layerVisible = anchor.isWorldSite ? worldSitesVisible : anchor.isNeighbor ? neighborsVisible : seatsVisible;
+      const point = layerVisible ? view.locate(anchor.coords) : null;
+      const shown = Boolean(point && onScreen(point, view) && (layers.places !== false || anchor.hasMarker));
+      if (shown && anchor.hasMarker) {
+        occupied.push({ left: point.x - 6, right: point.x + 6, top: point.y - 6, bottom: point.y + 6 });
+      }
+      return { anchor, point, shown };
+    });
+
+    for (const { anchor, point, shown } of projectedAnchors) {
+      const { id, stopId, group, label, width, isWorldSite, hasMarker, overview, duplicate } = anchor;
       let placement = null;
-      const layerVisible = isWorldSite ? worldSitesVisible : isNeighbor ? neighborsVisible : seatsVisible;
-      if (layerVisible) {
-        const point = view.locate(coords);
-        const shown = onScreen(point, view) && (layers.places !== false || hasMarker);
-        group.setAttribute('display', shown ? 'inline' : 'none');
-        if (shown) {
-          group.setAttribute('transform', `translate(${round(point.x)} ${round(point.y)})`);
-          const labelVisible = layers.places !== false
-            && (!isWorldSite || (!view.storyMap && (overview || view.scale > .34 || id === view.focusId)));
-          if (labelVisible) {
-            const candidate = hasMarker
-              ? labelBesideMarker(point, width, bounds, occupied) : centeredLabel(point, width, bounds, 3, 24);
-            if (labelFits(candidate, bounds, occupied)) {
-              placement = candidate;
-              occupied.push(placement);
-            }
+      group.setAttribute('display', shown ? 'inline' : 'none');
+      if (shown) {
+        group.setAttribute('transform', `translate(${round(point.x)} ${round(point.y)})`);
+        const suppressedByStop = Boolean(stopId && visibleStopIds?.has(stopId));
+        const labelVisible = !suppressedByStop && layers.places !== false
+          && (!isWorldSite || (!view.storyMap && (overview || view.scale > .34 || id === view.focusId)));
+        if (labelVisible) {
+          const candidate = hasMarker
+            ? labelBesideMarker(point, width, bounds, occupied) : centeredLabel(point, width, bounds, 3, 24);
+          if (labelFits(candidate, bounds, occupied)) {
+            placement = candidate;
+            occupied.push(placement);
           }
-          showLabel(label, placement, point);
         }
+        showLabel(label, placement, point);
       }
       // A visible administrative label takes the place of its general map name.
-      if (duplicate) duplicate.style.display = placement ? 'none' : '';
+      if (duplicate) duplicate.style.display = (placement || (stopId && visibleStopIds?.has(stopId))) ? 'none' : '';
     }
     return occupied;
   }

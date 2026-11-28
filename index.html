@@ -10,12 +10,12 @@
   <link rel="preload" href="./assets/fonts/gfs-didot-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="./assets/globe-relief-compact.webp" as="image" fetchpriority="high" media="(max-width: 52rem)">
   <link rel="preload" href="./assets/globe-relief.webp" as="image" fetchpriority="high" media="(min-width: 52.001rem)">
-  <link rel="stylesheet" href="./styles.css?v=d433a2b">
-  <link rel="stylesheet" href="./timeline.css?v=d433a2b">
-  <link rel="stylesheet" href="./layout.css?v=compact-reader">
-  <link rel="stylesheet" href="./historical-map.css">
-  <link rel="stylesheet" href="./typography.css">
-  <script type="module" src="./atlas.mjs?v=atlas-review"></script>
+  <link rel="stylesheet" href="./styles.css?v=storytelling-v3">
+  <link rel="stylesheet" href="./timeline.css?v=storytelling-v3">
+  <link rel="stylesheet" href="./layout.css?v=storytelling-v3">
+  <link rel="stylesheet" href="./historical-map.css?v=storytelling-v3">
+  <link rel="stylesheet" href="./typography.css?v=storytelling-v3">
+  <script type="module" src="./atlas.mjs?v=storytelling-v3"></script>
 </head>
 <body>
   <a class="skip-link" href="#timeline">Skip to the timeline</a>
@@ -56,8 +56,8 @@
             </div>
           </div>
           <figure class="sea-moment" id="sea-moment" aria-hidden="true" hidden>
-            <blockquote>“The sea! The sea!”</blockquote>
-            <figcaption>Xenophon, <i>Anabasis</i> 4.7.24</figcaption>
+            <blockquote id="moment-quote">“The sea! The sea!”</blockquote>
+            <figcaption id="moment-cite">Xenophon, <i>Anabasis</i> 4.7.24</figcaption>
           </figure>
           <div class="map-reference">
             <span class="map-north" aria-hidden="true">N<span></span></span>
@@ -65,6 +65,7 @@
             <div class="map-key" id="map-instructions">
               <span><i class="key-stop" aria-hidden="true"></i> Identified stop</span>
               <span><i class="key-estimate" aria-hidden="true"></i> Approximate or disputed</span>
+              <span id="borders-era" class="borders-era">Borders: c. 401 BCE</span>
             </div>
           </div>
           <p class="sr-only" id="globe-instructions">Drag to rotate, or use the arrow keys when the globe is focused.</p>
@@ -92,6 +93,7 @@
           <label><input type="checkbox" data-layer="worldSites" checked> World sites and communities</label>
           <label><input type="checkbox" data-layer="administration"> Satrapies and seats</label>
           <label><input type="checkbox" data-layer="neighbors"> Nearby peoples and cities</label>
+          <label><input type="checkbox" data-layer="altRoute"> Book IV route debate</label>
           <label><input type="checkbox" data-layer="places" checked> Place names</label>
           <label><input type="checkbox" data-layer="grid" checked> Latitude and longitude</label>
           <p>Political borders show a fixed, approximate snapshot around 401 BCE. Diamonds mark documented sites and communities. Small circles mark political centers.</p>
@@ -127,17 +129,6 @@
           </div>
           <div id="stop-timeline"></div>
         </section>
-        <aside class="glass-popover playback-menu" id="playback-settings" aria-label="Playback settings" hidden>
-          <label for="playback-speed">Speed
-            <select id="playback-speed">
-              <option value="0.75">0.75×</option>
-              <option value="1" selected>1×</option>
-              <option value="1.5">1.5×</option>
-              <option value="2">2×</option>
-            </select>
-          </label>
-          <label><input type="checkbox" id="follow-camera" checked> Follow the journey</label>
-        </aside>
         <aside id="world-focus-card" class="world-focus-card" aria-labelledby="world-focus-title" hidden>
           <h2 id="world-focus-title"></h2>
           <p></p>
@@ -150,6 +141,17 @@
           <div id="story-content"></div>
         </article>
       </div>
+      <aside class="glass-popover playback-menu" id="playback-settings" aria-label="Playback settings" hidden>
+        <label for="playback-speed">Speed
+          <select id="playback-speed">
+            <option value="0.75">0.75×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+          </select>
+        </label>
+        <label><input type="checkbox" id="follow-camera" checked> Follow the journey</label>
+      </aside>
       <noscript><p>The interactive route requires JavaScript. <a href="https://www.gutenberg.org/ebooks/1170">Read Xenophon’s account</a>.</p></noscript>
       <p id="announcement" class="sr-only" role="status"></p>
     </section>
@@ -202,6 +204,7 @@
         <h2 id="image-viewer-title"></h2>
       </div>
       <div class="scene-reader-actions">
+        <button type="button" id="reader-expand" class="reader-expand" aria-pressed="false" hidden>Full view</button>
         <nav aria-label="Read adjacent scenes">
           <button type="button" id="reader-previous" aria-label="Previous scene">‹</button>
           <button type="button" id="reader-next" aria-label="Next scene">›</button>

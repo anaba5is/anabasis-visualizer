@@ -1511,25 +1511,229 @@ details[open] > .reader-note-summary .reader-note-caret::before { content: '▾'
   z-index: 2;
   left: var(--atlas-left);
   bottom: calc(var(--atlas-above-dock) + 10.1rem);
+  max-width: min(29rem, calc(100vw - var(--atlas-story-width, 24rem) - 4rem));
   margin: 0;
-  padding: .35rem .6rem;
-  border-inline-start: 1px solid #e2c78f;
+  padding: .42rem .75rem;
+  border-inline-start: 2px solid #e2c78f;
+  border-radius: 0 .45rem .45rem 0;
   color: #fff1d1;
-  background: linear-gradient(90deg, #172c2ae8, #172c2a8c 78%, transparent);
+  background: linear-gradient(90deg, #152826f0, #152826b8 82%, transparent);
   pointer-events: none;
 }
 .sea-moment blockquote {
   margin: 0;
-  font: 400 clamp(1.26rem, 2.75vw, 2.45rem)/1.2 var(--display);
+  font: 400 clamp(1.06rem, 1.85vw, 1.58rem)/1.24 var(--display);
+  text-wrap: pretty;
 }
 .sea-moment figcaption {
-  margin-top: .15rem;
+  margin-top: .18rem;
   color: #f4dfb7;
   font-size: .68rem;
 }
 @media (max-width: 52rem), (max-width: 70rem) and (max-height: 30rem) {
-  .sea-moment { bottom: calc(var(--phone-tools-floor) + 3.15rem); }
+  .sea-moment {
+    bottom: calc(var(--phone-tools-floor) + 3.15rem);
+    max-width: calc(100vw - 1.5rem);
+  }
 }
 @media (max-height: 30rem) {
   .sea-moment { display: none; }
+}
+
+/* Museum mounts, elevation profile, landmarks and sheet co-viewing */
+
+.story-panel .scene[data-surface="paper"],
+.scene-viewer figure[data-surface="paper"] {
+  border-radius: .55rem;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 48%, #f9f2e5 0%, #eadac0 100%);
+}
+.story-panel .scene[data-surface="paper"] img,
+.scene-viewer figure[data-surface="paper"] img {
+  background: transparent;
+  mix-blend-mode: multiply;
+  padding: .42rem;
+}
+.story-panel .scene[data-surface="mount"] img,
+.scene-viewer figure[data-surface="mount"] img {
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    color-mix(in srgb, var(--scene-mount, #7d7b76) 94%, #fff7e8) 0%,
+    color-mix(in srgb, var(--scene-mount, #7d7b76) 86%, #0c1211) 100%
+  );
+  box-shadow: inset 0 0 0 1px rgb(255 248 232 / .15);
+}
+.story-panel .scene[data-surface="bleed"] img,
+.scene-viewer figure[data-surface="bleed"] img {
+  object-fit: cover;
+}
+
+.scene-viewer > header {
+  border-bottom: 1px solid #dfd1ba;
+  box-shadow: 0 6px 14px -10px rgb(24 18 10 / .24);
+}
+.reader-expand {
+  min-height: 2rem;
+  padding: .22rem .58rem;
+  border-radius: 999px;
+  font-size: .74rem;
+  font-weight: 620;
+}
+
+.reader-quote {
+  margin: .68rem 0 .1rem;
+  padding: .38rem .68rem;
+  border-inline-start: 2px solid #9f6a43;
+  border-radius: 0 .35rem .35rem 0;
+  background: #f2e7d3;
+  color: #3f2f21;
+}
+.reader-quote p {
+  margin: 0;
+  font: 400 .93rem/1.38 var(--display);
+}
+.reader-quote cite {
+  display: block;
+  margin-top: .2rem;
+  color: #725239;
+  font: 600 .69rem/1.2 var(--body);
+  font-style: normal;
+}
+
+.alt-route-toggle {
+  display: inline-flex;
+  align-items: center;
+  margin-top: .56rem;
+  min-height: 1.86rem;
+  padding: .22rem .64rem;
+  border: 1px solid #c6aa84;
+  border-radius: 999px;
+  background: #f1e3cb;
+  color: #5f3922;
+  font-size: .73rem;
+  font-weight: 640;
+  cursor: pointer;
+}
+.alt-route-toggle[aria-pressed="true"] {
+  background: #7c3b28;
+  border-color: #7c3b28;
+  color: #fff6ea;
+}
+
+.reader-telemetry {
+  margin-top: .68rem;
+  padding: .52rem .62rem .42rem;
+  border: 1px solid #dfd1ba;
+  border-radius: .52rem;
+  background: #f4ebdc;
+}
+.telemetry-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .28rem .38rem;
+  margin-bottom: .35rem;
+}
+.telemetry-pill {
+  padding: .1rem .44rem;
+  border: 1px solid #d7c5a8;
+  border-radius: 999px;
+  background: #fbf5ea;
+  color: #524130;
+  font-size: .66rem;
+  font-weight: 610;
+  line-height: 1.3;
+}
+.telemetry-muster {
+  border-color: #c79f78;
+  background: #f4e2cb;
+  color: #6b3822;
+}
+.elevation-chart {
+  display: block;
+  width: 100%;
+  height: 2.75rem;
+  overflow: visible;
+}
+.elev-sea-line { stroke: #cbb99d; stroke-width: 1; stroke-dasharray: 2 2; }
+.elev-area { fill: rgb(138 64 45 / .13); }
+.elev-line { fill: none; stroke: #8a402d; stroke-width: 1.5; stroke-linejoin: round; }
+.elev-cursor { stroke: #8a402d; stroke-width: 1; stroke-dasharray: 2 2; opacity: .55; }
+.elev-dot { fill: #fbf4e6; stroke: #7d563c; stroke-width: 1.25; cursor: pointer; }
+.elev-dot.is-current { fill: #8a402d; stroke: #fff6e6; stroke-width: 1.6; }
+.elev-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: .12rem;
+  color: #75634e;
+  font-size: .6rem;
+  font-weight: 560;
+}
+
+.alt-route-shadow, .alt-route-path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.alt-route-shadow { stroke: #1a2422; stroke-width: 4.2px; stroke-dasharray: 2 6; opacity: .72; }
+.alt-route-path { stroke: #f29b76; stroke-width: 2.4px; stroke-dasharray: 2 6; }
+.alt-route-label {
+  font: italic 600 12px var(--display);
+  fill: #ffd8c2;
+  stroke: #1b2725;
+  stroke-width: 3.4px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+  pointer-events: none;
+}
+
+.landmark-dot {
+  fill: #1f3330;
+  stroke: #f1dec0;
+  stroke-width: 1.3px;
+  vector-effect: non-scaling-stroke;
+}
+.landmark-label {
+  font: italic 500 11.5px var(--display);
+  fill: #efe2ca;
+  stroke: #182624;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+  pointer-events: none;
+}
+
+.borders-era {
+  padding-left: .48rem;
+  border-left: 1px solid var(--glass-edge);
+  color: #e5d2b2;
+  font-size: .63rem;
+}
+
+.playback-menu { z-index: 9; }
+.layer-menu {
+  max-height: min(29rem, calc(100dvh - 5rem));
+}
+.layer-menu label { min-height: 1.82rem; font-size: .81rem; }
+.source-notes { z-index: 9; max-height: calc(100dvh - var(--atlas-top) - var(--atlas-header) - var(--atlas-above-dock)); }
+
+.scene-viewer[data-presentation="sheet"] {
+  max-height: 55dvh;
+  box-shadow: 0 -10px 32px rgb(6 16 15 / .42);
+  transition: max-height .22s ease;
+}
+.scene-viewer[data-presentation="sheet"][data-expanded="true"] {
+  max-height: 89dvh;
+}
+.scene-viewer[data-presentation="sheet"]:not([data-expanded="true"])::backdrop {
+  background: linear-gradient(180deg, transparent 0%, transparent 40%, rgb(10 24 22 / .44) 52%);
+  backdrop-filter: none;
+}
+.scene-viewer[data-presentation="sheet"]:not([data-expanded="true"]) figure img {
+  max-height: 20dvh;
+}
+
+@media (max-width: 52rem), (max-width: 70rem) and (max-height: 30rem) {
+  .phone-stage { font-size: .58rem; letter-spacing: .01em; }
 }

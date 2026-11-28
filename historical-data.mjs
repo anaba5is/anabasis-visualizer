@@ -11,7 +11,7 @@ export const politicalRegions = [
   {
     id: 'achaemenid-empire',
     name: 'Achaemenid Empire',
-    coords: [46.2, 34.0],
+    coords: [51.2, 32.6],
     rings: achaemenidRings,
     color: '#0d2e3d',
     fillColor: '#2884a1',
@@ -50,7 +50,7 @@ export const politicalRegions = [
 
 export const administrations = [
   {
-    id: 'sardis-lydia', name: 'Sardis', kind: 'seat', coords: [28.04, 38.49], source: satrapies,
+    id: 'sardis-lydia', stopId: 'sardis', name: 'Sardis', kind: 'seat', coords: [28.04, 38.49], source: satrapies,
     note: 'Seat of Achaemenid Lydia, called Sparda in Old Persian. Cyrus gathered the expedition here.',
   },
   {
@@ -66,7 +66,7 @@ export const administrations = [
     note: 'An attested Achaemenid province. The marker locates the broad region, whose administrative divisions and frontiers changed over time.',
   },
   {
-    id: 'tarsus-cilicia', name: 'Tarsus', kind: 'seat', coords: [34.89, 36.92], source: anabasis(1, 2),
+    id: 'tarsus-cilicia', stopId: 'tarsus', name: 'Tarsus', kind: 'seat', coords: [34.89, 36.92], source: anabasis(1, 2),
     note: 'Seat of Syennesis, the local ruler of Cilicia in 401 BCE. Cilicia’s administration was reorganized under direct royal appointees after this period.',
   },
   {

@@ -3,6 +3,17 @@ import { scenes } from './scenes.mjs';
 import { html, link } from './dom.mjs';
 import { expeditionContext, sceneContext } from './scene-context.mjs';
 import { placeAndBook, formatStopDate } from './journey-format.mjs';
+import { primaryQuotes, stopMetrics } from './expedition-metrics.mjs';
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const MAX_ELEVATION = 2300;
+
+function svgEl(tag, attrs = {}, text = '') {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, val] of Object.entries(attrs)) node.setAttribute(key, val);
+  if (text) node.textContent = text;
+  return node;
+}
 
 function noteSummary(label, preview) {
   const summary = html('summary', 'reader-note-summary');
@@ -44,7 +55,79 @@ function contextNote({ title, text, source, sourceLabel }) {
   return note;
 }
 
-export function createSceneReader(dialog, { index, select, pause, fallbackFocus, onLayout }) {
+function buildElevationCard(activeIndex, select) {
+  const stop = stops[activeIndex];
+  const metrics = stopMetrics[stop.id];
+  if (!metrics) return null;
+
+  const card = html('div', 'reader-telemetry');
+  const pills = html('div', 'telemetry-pills');
+  pills.append(
+    html('span', 'telemetry-pill', metrics.terrain),
+    html('span', 'telemetry-pill', metrics.plottedKm ? `~${metrics.plottedKm.toLocaleString('en-US')} km plotted` : 'Start of march'),
+  );
+  if (metrics.muster) {
+    pills.append(html('span', 'telemetry-pill telemetry-muster', `${metrics.muster} (${metrics.musterCite})`));
+  }
+
+  const width = 280;
+  const top = 7;
+  const bottom = 39;
+  const left = 10;
+  const right = width - 10;
+  const coords = stops.map((item, idx) => {
+    const elev = stopMetrics[item.id]?.elevationM ?? 0;
+    const x = left + (right - left) * (idx / (stops.length - 1));
+    const y = bottom - (bottom - top) * (elev / MAX_ELEVATION);
+    return { x, y, item, idx, elev };
+  });
+
+  const chart = svgEl('svg', {
+    class: 'elevation-chart',
+    viewBox: `0 0 ${width} 46`,
+    role: 'img',
+    'aria-label': `Expedition elevation profile. Current stop: ${stop.name}, ${metrics.terrain}.`,
+  });
+  const lineD = coords.map((pt, idx) => `${idx ? 'L' : 'M'}${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`).join('');
+  const areaD = `${lineD}L${right} ${bottom}L${left} ${bottom}Z`;
+  const activeX = coords[activeIndex].x.toFixed(1);
+
+  chart.append(
+    svgEl('line', { class: 'elev-sea-line', x1: left, y1: bottom, x2: right, y2: bottom }),
+    svgEl('path', { class: 'elev-area', d: areaD }),
+    svgEl('path', { class: 'elev-line', d: lineD }),
+    svgEl('line', { class: 'elev-cursor', x1: activeX, y1: top - 2, x2: activeX, y2: bottom }),
+  );
+
+  for (const pt of coords) {
+    const current = pt.idx === activeIndex;
+    const dot = svgEl('circle', {
+      class: current ? 'elev-dot is-current' : 'elev-dot',
+      cx: pt.x.toFixed(1),
+      cy: pt.y.toFixed(1),
+      r: current ? '3.6' : '2.1',
+    });
+    dot.append(svgEl('title', {}, `${pt.item.name}: ${stopMetrics[pt.item.id]?.terrain ?? ''}`));
+    dot.addEventListener('click', () => select(pt.idx));
+    chart.append(dot);
+  }
+
+  const labels = html('div', 'elev-axis');
+  labels.setAttribute('aria-hidden', 'true');
+  labels.append(
+    html('span', '', 'Sardis'),
+    html('span', '', 'Peak ~2,200 m (Theches)'),
+    html('span', '', 'Pergamum'),
+  );
+
+  card.append(pills, chart, labels);
+  return card;
+}
+
+export function createSceneReader(dialog, {
+  index, select, pause, fallbackFocus, onLayout, isAltRoute, onToggleAltRoute,
+}) {
+  const readerFigure = dialog.querySelector('figure');
   const readerImage = dialog.querySelector('img');
   const readerCaption = dialog.querySelector('figcaption');
   const readerRegion = dialog.querySelector('#scene-viewer-region');
@@ -53,19 +136,38 @@ export function createSceneReader(dialog, { index, select, pause, fallbackFocus,
   const readerCopy = dialog.querySelector('#scene-viewer-copy');
   const readerPrevious = dialog.querySelector('#reader-previous');
   const readerNext = dialog.querySelector('#reader-next');
+  const readerExpand = dialog.querySelector('#reader-expand');
   const desktop = matchMedia('(min-width: 52.01rem) and (min-height: 30.01rem), (min-width: 70.01rem)');
   let opener;
   let restoreOnClose = true;
   let renderedIndex;
   readerTitle.tabIndex = -1;
 
-  function render(i) {
-    if (i === renderedIndex) return;
+  function syncExpandButton() {
+    if (!readerExpand) return;
+    const isSheet = dialog.dataset.presentation === 'sheet';
+    readerExpand.hidden = !isSheet;
+    const expanded = dialog.dataset.expanded === 'true';
+    readerExpand.setAttribute('aria-pressed', String(expanded));
+    readerExpand.textContent = expanded ? 'Map view' : 'Full view';
+  }
+
+  function notifyLayout() {
+    const sideOpen = dialog.open && dialog.dataset.presentation === 'side';
+    const halfSheet = dialog.open && dialog.dataset.presentation === 'sheet' && dialog.dataset.expanded !== 'true';
+    onLayout(sideOpen, halfSheet);
+  }
+
+  function render(i, force = false) {
+    if (i === renderedIndex && !force) return;
     renderedIndex = i;
     const stop = stops[i];
     const scene = scenes[stop.id];
     readerRegion.textContent = placeAndBook(stop) + ' · ' + formatStopDate(stop);
     readerTitle.textContent = stop.name;
+    readerFigure.dataset.surface = scene.surface ?? (scene.mount ? 'mount' : 'bleed');
+    if (scene.mount) readerFigure.style.setProperty('--scene-mount', scene.mount);
+    else readerFigure.style.removeProperty('--scene-mount');
     readerImage.src = `./assets/${scene.file}`;
     readerImage.alt = scene.alt;
     const objectMetadata = [scene.imageKind, scene.objectDate].filter(Boolean);
@@ -88,6 +190,38 @@ export function createSceneReader(dialog, { index, select, pause, fallbackFocus,
     const lead = hasBackstory && stop.detail.match(/^(.+?[.!?]) (.+)$/);
     readerLead.replaceChildren(html('h3', '', stop.title), html('p', '', stop.summary));
     if (lead) readerLead.append(html('p', '', lead[1]));
+
+    const quote = stop.id === 'mount-theches' ? null : primaryQuotes[stop.id];
+    if (quote) {
+      const block = html('blockquote', 'reader-quote');
+      const cite = html('cite', '', 'Xenophon, ');
+      cite.append(html('i', '', 'Anabasis'), ` ${quote.cite}`);
+      block.append(html('p', '', `“${quote.text}”`), cite);
+      readerLead.append(block);
+    }
+
+    if (onToggleAltRoute && (stop.id === 'mount-theches' || stop.id === 'armenian-highlands')) {
+      const toggle = html('button', 'alt-route-toggle');
+      toggle.type = 'button';
+      const syncAlt = () => {
+        const active = Boolean(isAltRoute?.());
+        toggle.setAttribute('aria-pressed', String(active));
+        toggle.textContent = active ? 'Hide eastern route hypothesis' : 'Compare eastern route hypothesis';
+      };
+      syncAlt();
+      toggle.addEventListener('click', () => {
+        onToggleAltRoute();
+        syncAlt();
+      });
+      readerLead.append(toggle);
+    }
+
+    const telemetry = buildElevationCard(i, nextIdx => {
+      select(nextIdx);
+      readerTitle.focus({ preventScroll: true });
+    });
+    if (telemetry) readerLead.append(telemetry);
+
     const backstory = html('details', 'reader-backstory');
     backstory.append(noteSummary(hasBackstory ? 'Backstory' : 'More about this stop', (context ?? opening)?.title));
     const content = html('div', 'reader-backstory-copy');
@@ -106,11 +240,17 @@ export function createSceneReader(dialog, { index, select, pause, fallbackFocus,
     return dialog.open && dialog.dataset.presentation === 'side';
   }
 
+  function isHalfSheetOpen() {
+    return dialog.open && dialog.dataset.presentation === 'sheet' && dialog.dataset.expanded !== 'true';
+  }
+
   function show() {
     dialog.dataset.presentation = desktop.matches ? 'side' : 'sheet';
+    if (!desktop.matches && !dialog.dataset.expanded) dialog.dataset.expanded = 'false';
+    syncExpandButton();
     if (desktop.matches) dialog.show();
     else dialog.showModal();
-    onLayout(isSideOpen());
+    notifyLayout();
   }
 
   function close(restoreFocus = true) {
@@ -126,11 +266,16 @@ export function createSceneReader(dialog, { index, select, pause, fallbackFocus,
     readerTitle.focus({ preventScroll: true });
   }
 
+  readerExpand?.addEventListener('click', () => {
+    dialog.dataset.expanded = dialog.dataset.expanded === 'true' ? 'false' : 'true';
+    syncExpandButton();
+    notifyLayout();
+  });
   readerPrevious.addEventListener('click', () => step(-1));
   readerNext.addEventListener('click', () => step(1));
   dialog.addEventListener('close', () => {
     if (dialog.open) return;
-    onLayout(false);
+    notifyLayout();
     if (restoreOnClose) {
       const target = opener?.isConnected && opener.getClientRects().length ? opener : fallbackFocus();
       target.focus({ preventScroll: true });
@@ -160,15 +305,24 @@ export function createSceneReader(dialog, { index, select, pause, fallbackFocus,
       pause();
       opener = trigger;
       restoreOnClose = true;
-      render(index());
+      if (!desktop.matches) dialog.dataset.expanded = 'false';
+      render(index(), true);
       if (!dialog.open) show();
+      else {
+        syncExpandButton();
+        notifyLayout();
+      }
       dialog.scrollTop = 0;
       readerTitle.focus({ preventScroll: true });
     },
     update(i) {
       if (dialog.open) render(i);
     },
+    refresh() {
+      if (dialog.open) render(index(), true);
+    },
     isSideOpen,
+    isHalfSheetOpen,
     close,
   };
 }

@@ -14,7 +14,7 @@ export function connectWorldPanel({ onLayerReady, onFocus, onBrowse, onReturn })
 
   function activate(entry, type, updateHash = true) {
     const outline = entry.kind === 'territory';
-    const zoom = type === 'world' ? undefined : outline && entry.areaKm2 < 35000 ? 1.25 : .55;
+    const zoom = type === 'world' ? entry.scale : outline && entry.areaKm2 < 35000 ? 1.25 : .55;
     title.textContent = entry.name;
     note.textContent = entry.note ?? 'Explore the historical layer around 401 BCE.';
     source.hidden = !entry.source;

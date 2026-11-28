@@ -149,6 +149,38 @@ export const uncertainLegs = new Set([
   'pergamum',
 ]);
 
+// Named text landmarks along the march shown quietly at closer route zoom.
+export const routeLandmarks = [
+  { id: 'celaenae-park', name: 'Celaenae', leg: 'tarsus', coords: [30.17, 38.07], cite: '1.2.7–9', note: 'Cyrus’s palace and game park at the sources of the Maeander; 30 days halt.' },
+  { id: 'iconium', name: 'Iconium', leg: 'tarsus', coords: [32.48, 37.87], cite: '1.2.19', note: 'Last city of Phrygia before entering Lycaonia.' },
+  { id: 'cilician-gates', name: 'Cilician Gates', leg: 'tarsus', coords: [34.78, 37.31], cite: '1.2.21', note: 'Narrow wagon pass through the Taurus range into Cilicia.' },
+  { id: 'myriandrus', name: 'Myriandrus', leg: 'thapsacus', coords: [36.21, 36.64], cite: '1.4.6–8', note: 'Phoenician coastal trading port where Xenias and Pasion deserted by ship.' },
+  { id: 'larisa-nimrud', name: 'Larisa (Nimrud)', leg: 'mespila', coords: [43.33, 36.10], cite: '3.4.7–9', note: 'Massive deserted brick walls beside a stone pyramid on the Tigris.' },
+  { id: 'centrites', name: 'Centrites', leg: 'armenian-highlands', coords: [42.03, 37.93], cite: '4.3.1–34', note: 'Border river between Carduchia and Armenia, commonly the Botan.' },
+  { id: 'gymnias', name: 'Gymnias', leg: 'mount-theches', coords: [40.25, 40.25], cite: '4.7.19', note: 'Inland city whose ruler supplied the five-day guide toward the sea.' },
+  { id: 'cerasus', name: 'Cerasus', leg: 'cotyora', coords: [38.38, 40.88], cite: '5.3.2–3', note: 'Sinopean colony where a review counted 8,600 surviving soldiers.' },
+  { id: 'sinope', name: 'Sinope', leg: 'calpe', coords: [35.17, 42.02], cite: '6.1.15–18', note: 'Milesian mother-city on the Black Sea where the army elected Cheirisophus sole commander.' },
+  { id: 'heraclea', name: 'Heraclea', leg: 'calpe', coords: [31.34, 41.32], cite: '6.2.1–16', note: 'Megarian colony where disputes split the army into three divisions.' },
+  { id: 'chrysopolis', name: 'Chrysopolis', leg: 'byzantium', coords: [29.06, 41.04], cite: '6.6.38', note: 'Chalcedonian port opposite Byzantium where the soldiers sold their plunder.' },
+  { id: 'lampsacus', name: 'Lampsacus', leg: 'pergamum', coords: [26.69, 40.34], cite: '7.8.1–6', note: 'Hellespontine city where Xenophon sold his horse and sacrificed to Zeus Meilichios.' },
+];
+
+// Eastern Erzurum / Polut Dagi corridor compared in Brennan & Tuplin (2023).
+export const alternativeBook4Corridor = {
+  name: 'Eastern Polut corridor (alt.)',
+  points: [
+    [41.64, 39.18],
+    [41.27, 39.91],
+    [40.92, 40.26],
+    [40.52, 40.54],
+    [40.28, 40.62],
+    [40.02, 40.88],
+    [39.72, 41.00],
+  ],
+  labelCoords: [40.52, 40.54],
+  source: 'https://doi.org/10.1017/S0066154623000054',
+};
+
 export const mapReferences = [
   {
     name: 'Natural Earth',

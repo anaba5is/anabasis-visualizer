@@ -12,6 +12,7 @@ export const ancientCoast = {
     objectDate: 'c. 360–330 BCE',
     imageKind: 'Silver drachm',
     contain: true,
+    surface: 'paper',
   },
   cotyora: {
     file: 'ancient-coast-sinope-drachm.webp',
@@ -24,6 +25,7 @@ export const ancientCoast = {
     objectDate: 'c. 410–350 BCE',
     imageKind: 'Silver drachm',
     contain: true,
+    surface: 'paper',
   },
   calpe: {
     file: 'ancient-coast-lenormant-relief.webp',
@@ -37,6 +39,7 @@ export const ancientCoast = {
     objectDate: 'c. 410–400 BCE',
     imageKind: 'Marble relief',
     contain: true,
+    mount: '#2f3178',
   },
   byzantium: {
     file: 'ancient-coast-byzantion-hemidrachm.webp',
@@ -49,6 +52,7 @@ export const ancientCoast = {
     objectDate: 'c. 387–339 BCE',
     imageKind: 'Silver half-drachm',
     contain: true,
+    surface: 'paper',
   },
   salmydessus: {
     file: 'ancient-coast-rogozen-detail.webp',
@@ -73,5 +77,6 @@ export const ancientCoast = {
     objectDate: '390–380 BCE',
     imageKind: 'Gold stater',
     contain: true,
+    surface: 'paper',
   },
 };
