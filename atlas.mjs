@@ -14,7 +14,7 @@ import { connectPopover } from './popover.mjs';
 import { readAtlasLocation, writeAtlasLocation } from './atlas-location.mjs';
 import { connectWorldPanel } from './world-panel.mjs?v=storytelling-v6';
 import { html, link } from './dom.mjs';
-import { createSceneReader } from './scene-reader.mjs?v=storytelling-v6';
+import { createSceneReader } from './scene-reader.mjs?v=storytelling-v7';
 import { bookFor, placeAndBook, formatStopDate } from './journey-format.mjs';
 import { fitMapViewport } from './map-viewport.mjs';
 import { primaryQuotes } from './expedition-metrics.mjs?v=storytelling-v6';

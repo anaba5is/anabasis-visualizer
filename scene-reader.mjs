@@ -129,49 +129,87 @@ function buildFiguresSection(stopId, select) {
   const ids = stopFigures[stopId];
   if (!ids?.length) return null;
 
-  const section = html('div', 'reader-figures');
-  const heading = html('span', 'figures-heading', 'Key figures');
-  const chips = html('div', 'figure-chips');
-  const detail = html('div', 'figure-bio');
-  detail.hidden = true;
+  const section = html('section', 'reader-figures');
+  section.append(html('h3', 'figures-heading', 'In this scene'));
+  const strip = html('div', 'figure-strip');
+  const plate = html('div', 'figure-plate');
+  plate.hidden = true;
   let openId = null;
 
-  const buttons = new Map();
+  const cards = new Map();
   for (const id of ids) {
     const person = figures[id];
     if (!person) continue;
-    const btn = html('button', `figure-chip faction-${person.faction.toLowerCase()}`);
+    const btn = html('button', 'figure-card');
     btn.type = 'button';
     btn.setAttribute('aria-pressed', 'false');
-    btn.append(html('span', 'figure-dot'), html('span', '', person.name));
+
+    const thumbWrap = html('span', 'figure-thumb');
+    thumbWrap.dataset.surface = person.surface ?? (person.mount ? 'mount' : 'bleed');
+    if (person.mount) thumbWrap.style.setProperty('--portrait-mount', person.mount);
+    const thumb = html('img', person.contain ? 'is-contain' : '');
+    thumb.src = `./assets/${person.image}`;
+    thumb.alt = '';
+    thumb.loading = 'lazy';
+    thumb.decoding = 'async';
+    if (person.crop) thumb.style.objectPosition = person.crop;
+    thumbWrap.append(thumb);
+
+    const caption = html('span', 'figure-card-meta');
+    caption.append(
+      html('span', 'figure-card-name', person.shortName ?? person.name),
+      html('span', 'figure-card-origin', person.origin),
+    );
+    btn.append(thumbWrap, caption);
+
     btn.addEventListener('click', () => {
       const same = openId === id;
       openId = same ? null : id;
-      for (const [k, b] of buttons) b.setAttribute('aria-pressed', String(k === openId));
+      for (const [k, b] of cards) b.setAttribute('aria-pressed', String(k === openId));
       if (!openId) {
-        detail.hidden = true;
+        plate.hidden = true;
         return;
       }
+
+      const portrait = html('figure', 'figure-plate-media');
+      portrait.dataset.surface = person.surface ?? (person.mount ? 'mount' : 'bleed');
+      if (person.mount) portrait.style.setProperty('--portrait-mount', person.mount);
+      const img = html('img', person.contain ? 'is-contain' : '');
+      img.src = `./assets/${person.image}`;
+      img.alt = person.alt;
+      if (person.crop) img.style.objectPosition = person.crop;
+      const figcap = html('figcaption', '', `${person.imageKind} · ${person.objectDate}`);
+      portrait.append(img, figcap);
+
+      const copy = html('div', 'figure-plate-copy');
+      const head = html('div', 'figure-plate-head');
+      head.append(html('h4', '', person.name), html('p', 'figure-plate-role', `${person.role} · ${person.origin}`));
+
+      const trail = html('p', 'figure-trail');
+      trail.append(html('span', 'figure-trail-label', 'Route: '));
       const appears = stops
         .map((s, idx) => ({ s, idx }))
         .filter(({ s }) => stopFigures[s.id]?.includes(id));
-      const head = html('div', 'figure-bio-head');
-      head.append(html('strong', '', person.name), html('span', 'figure-role', `${person.faction} · ${person.role}`));
-      const stopsRow = html('div', 'figure-stops');
-      stopsRow.append(html('span', 'figure-stops-label', 'Appears at:'));
-      for (const { s, idx } of appears) {
-        const jump = html('button', s.id === stopId ? 'figure-stop-link is-here' : 'figure-stop-link', s.name);
+      appears.forEach(({ s, idx }, pos) => {
+        if (pos > 0) trail.append(html('span', 'figure-trail-sep', ' → '));
+        const jump = html('button', s.id === stopId ? 'figure-trail-link is-here' : 'figure-trail-link', s.name);
         jump.type = 'button';
         jump.addEventListener('click', () => select(idx));
-        stopsRow.append(jump);
-      }
-      detail.replaceChildren(head, html('p', '', person.bio), stopsRow, link(person.cite, person.source));
-      detail.hidden = false;
+        trail.append(jump);
+      });
+
+      const meta = html('p', 'figure-plate-credit', `${person.imageNote} `);
+      meta.append(link(person.cite, person.source), ' · ', link(person.credit, person.imageSource));
+      if (person.licenseUrl) meta.append(' (', link(person.licenseName, person.licenseUrl), ')');
+
+      copy.append(head, html('p', 'figure-plate-bio', person.bio), trail, meta);
+      plate.replaceChildren(portrait, copy);
+      plate.hidden = false;
     });
-    buttons.set(id, btn);
-    chips.append(btn);
+    cards.set(id, btn);
+    strip.append(btn);
   }
-  section.append(heading, chips, detail);
+  section.append(strip, plate);
   return section;
 }
 

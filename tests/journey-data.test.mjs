@@ -12,15 +12,18 @@ import { stopMetrics, primaryQuotes } from '../expedition-metrics.mjs';
 import { routeLandmarks, seaLegs, alternativeBook4Corridor } from '../map-data.mjs';
 import { figures, stopFigures } from '../expedition-figures.mjs';
 
-test('every stop has key figures with valid bios and Wikisource links', () => {
+test('every stop has key figures with verified local portraits and source links', () => {
   const ids = stops.map(stop => stop.id);
   assert.deepEqual([...ids].sort(), Object.keys(stopFigures).sort());
   for (const [stopId, list] of Object.entries(stopFigures)) {
     assert(list.length >= 2, stopId);
     for (const id of list) {
       const person = figures[id];
-      assert(person && person.name && person.faction && person.bio, id);
+      assert(person && person.name && person.origin && person.bio && person.imageKind && person.objectDate, id);
+      assert(existsSync(new URL('../assets/' + person.image, import.meta.url)), id);
       assert.equal(new URL(person.source).protocol, 'https:', id);
+      assert.equal(new URL(person.imageSource).protocol, 'https:', id);
+      assert.equal(new URL(person.licenseUrl).protocol, 'https:', id);
     }
   }
   for (const leg of seaLegs) assert(ids.includes(leg), leg);
